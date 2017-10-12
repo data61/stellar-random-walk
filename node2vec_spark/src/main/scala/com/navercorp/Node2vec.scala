@@ -112,13 +112,16 @@ object Node2vec extends Serializable {
     g.edges.unpersist(blocking = false)
     g.vertices.unpersist(blocking = false)
 
-    var totalRandomPath: RDD[String] = null
+    var totalRandomPath: RDD[String] = null // Includes all the random walks in the format of
+    // tab-separated vertex ids per tuple. It contains config.numWalks number of walks per vertex.
+
     for (iter <- 0 until config.numWalks) {
       var prevRandomPath: RDD[String] = null
       var randomPath: RDD[String] = examples.map { case (nodeId, clickNode) =>
         clickNode.path.mkString("\t")
       }.cache // clickNode is NodeAttr. Makes a tab-separated string of path elements.
-      var activeWalks = randomPath.first // get the first path
+      var activeWalks = randomPath.first // not used?!
+      // For the length of walks for every vertex, do walk in parallel. Each vertex, keeps the path of its own.
       for (walkCount <- 0 until config.walkLength) {
         prevRandomPath = randomPath
         // Join the last of edge of each path with its attribute
@@ -146,7 +149,7 @@ object Node2vec extends Serializable {
           }.filter(_ != null)
         }.cache
 
-        activeWalks = randomPath.first
+        activeWalks = randomPath.first // Not used?!
         prevRandomPath.unpersist(blocking = false)
       }
 

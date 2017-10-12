@@ -6,6 +6,9 @@ import org.apache.spark.mllib.feature.{Word2Vec, Word2VecModel}
 import org.apache.spark.rdd.RDD
 import com.navercorp.common.Property
 
+/**
+  * Uses Word2vec implemented in Spark ML library.
+  */
 object Word2vec extends Serializable {
   var context: SparkContext = _
   var config: Params = _
@@ -19,6 +22,7 @@ object Word2vec extends Serializable {
     /**
       * model = sg
       * update = hs
+      * Note that number of partitions affect the accuracy.
       */
     word2vec.setLearningRate(param.lr)
             .setNumIterations(param.iter)

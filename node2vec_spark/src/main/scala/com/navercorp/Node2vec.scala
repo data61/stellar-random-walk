@@ -26,6 +26,7 @@ object Node2vec extends Serializable {
 
   /**
     * Loads the graph and computes the probabilities to go from each vertex to its neighbors
+    *
     * @return
     */
   def loadGraph() = {
@@ -96,11 +97,12 @@ object Node2vec extends Serializable {
   }
 
   def randomWalk(g: Graph[NodeAttr, EdgeAttr]) = {
-    // create a list of edges and partitions them based on hash of srcIdDstId.
+    // create a list of edges in the format of (srcIdDstId, edgeAttr) and partitions them based
+    // on hash of srcIdDstId.
     val edge2attr = g.triplets.map { edgeTriplet =>
       (s"${edgeTriplet.srcId}${edgeTriplet.dstId}", edgeTriplet.attr)
     }.reduceByKey { case (l, r) => l }.partitionBy(new HashPartitioner(200)).persist(StorageLevel
-      .MEMORY_ONLY)
+      .MEMORY_ONLY) // What is actually reducebykey doing?
     logger.info(s"edge2attr: ${edge2attr.count}")
 
     val examples = g.vertices.cache // Why is it called examples?
@@ -116,20 +118,22 @@ object Node2vec extends Serializable {
       var randomPath: RDD[String] = examples.map { case (nodeId, clickNode) =>
         clickNode.path.mkString("\t")
       }.cache // clickNode is NodeAttr. Makes a tab-separated string of path elements.
-      var activeWalks = randomPath.first
+      var activeWalks = randomPath.first // get the first path
       for (walkCount <- 0 until config.walkLength) {
         prevRandomPath = randomPath
+        // Join the last of edge of each path with its attribute
         randomPath = edge2attr.join(randomPath.mapPartitions { iter =>
           iter.map { pathBuffer =>
-            val paths = pathBuffer.split("\t")
-
+            val paths = pathBuffer.split("\t") // Get the path nodes
+            // The last two nodes of the path and concat them. make a (lastEdgeOfThePath, path)
             (paths.slice(paths.size - 2, paths.size).mkString(""), pathBuffer)
           }
         }).mapPartitions { iter =>
           iter.map { case (edge, (attr, pathBuffer)) =>
             try {
               if (pathBuffer != null && pathBuffer.nonEmpty) {
-                val nextNodeIndex = GraphOps.drawAlias(attr.J, attr.q)
+                val nextNodeIndex = GraphOps.drawAlias(attr.J, attr.q) // biased random selection
+                // of the next node
                 val nextNodeId = attr.dstNeighbors(nextNodeIndex)
 
                 s"$pathBuffer\t$nextNodeId"
@@ -193,8 +197,8 @@ object Node2vec extends Serializable {
 
   def createNode2Id[T <: Any](triplets: RDD[(String, String, T)]): RDD[(String, Long)] = triplets
     .flatMap { case (src, dst, weight) =>
-    Try(Array(src, dst)).getOrElse(Array.empty[String])
-  }.distinct().zipWithIndex()
+      Try(Array(src, dst)).getOrElse(Array.empty[String])
+    }.distinct().zipWithIndex()
 
   def save(randomPaths: RDD[String]): this.type = {
     randomPaths.filter(x => x != null && x.replaceAll("\\s", "").length > 0)

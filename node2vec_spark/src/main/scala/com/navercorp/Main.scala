@@ -17,7 +17,7 @@ import org.apache.spark.serializer.KryoRegistrator
 object Main {
   //  lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   lazy val logger = LogManager.getLogger("myLogger")
-  val useKyroSerializer: Boolean = false
+//  val useKyroSerializer: Boolean = false
 
   object Command extends Enumeration {
     type Command = Value
@@ -42,6 +42,7 @@ object Main {
                     nodePath: String = null,
                     input: String = null,
                     output: String = null,
+                    useKyroSerializer: Boolean = false,
                     cmd: Command = Command.node2vec) extends AbstractParams[Params] with
     Serializable
 
@@ -88,6 +89,9 @@ object Main {
       .required()
       .text(s"command: ${defaultParams.cmd.toString}")
       .action((x, c) => c.copy(cmd = Command.withName(x)))
+    opt[Boolean]("kryo")
+      .text(s"Whether to use kryo serializer or not: ${defaultParams.useKyroSerializer}")
+      .action((x, c) => c.copy(useKyroSerializer = x))
     note(
       """
         |For example, the following command runs this app on a synthetic dataset:
@@ -108,13 +112,9 @@ object Main {
   def main(args: Array[String]) {
     parser.parse(args, defaultParams).map { param =>
       val conf = new SparkConf().setAppName("Node2Vec")
-      if (useKyroSerializer) {
+      if (param.useKyroSerializer) {
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-        //        conf.set("spark.kryo.registrator", "com.navercorp.MyRegistrator")
         conf.set("spark.kryo.registrationRequired", "true")
-        //      conf.registerKryoClasses(Array(classOf[Node2vec], classOf[Word2vec],
-        // classOf[NodeAttr],
-        //        classOf[EdgeAttr]))
         conf.registerKryoClasses(Array(
           classOf[NodeAttr],
           classOf[EdgeAttr],

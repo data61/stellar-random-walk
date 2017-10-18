@@ -13,7 +13,7 @@ import org.apache.spark.storage.StorageLevel
 import com.navercorp.graph.{GraphOps, EdgeAttr, NodeAttr}
 import com.navercorp.common.Property
 
-class Node2vec extends Serializable {
+object Node2vec extends Serializable {
 //  lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   lazy val logger = LogManager.getLogger("myLogger")
   val partitions = 20
@@ -83,7 +83,7 @@ class Node2vec extends Serializable {
           bcMaxDegree.value)
       }
 
-      (srcId, new NodeAttr(neighbors = neighbors_))
+      (srcId, NodeAttr(neighbors = neighbors_))
     }.repartition(partitions).cache
 
 
@@ -92,7 +92,7 @@ class Node2vec extends Serializable {
     // Repartition shuffles tO(m)
     val edge2attr = node2attr.flatMap { case (srcId, clickNode) =>
       clickNode.neighbors.map { case (dstId, weight) =>
-        Edge(srcId, dstId, new EdgeAttr())
+        Edge(srcId, dstId, EdgeAttr())
       }
     }.repartition(partitions).cache
 

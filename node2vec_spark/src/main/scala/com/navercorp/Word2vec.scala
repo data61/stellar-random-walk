@@ -9,7 +9,7 @@ import com.navercorp.common.Property
 /**
   * Uses Word2vec implemented in Spark ML library.
   */
-class Word2vec extends Serializable {
+object Word2vec extends Serializable {
   var context: SparkContext = _
   var config: Params = _
   var model: Word2VecModel = _

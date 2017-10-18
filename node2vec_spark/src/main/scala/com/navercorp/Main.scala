@@ -17,7 +17,7 @@ import org.apache.spark.serializer.KryoRegistrator
 object Main {
   //  lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   lazy val logger = LogManager.getLogger("myLogger")
-  val useKyroSerializer: Boolean = true
+  val useKyroSerializer: Boolean = false
 
   object Command extends Enumeration {
     type Command = Value
@@ -106,8 +106,6 @@ object Main {
   }
 
   def main(args: Array[String]) {
-    val node2vec = new Node2vec()
-    val word2vec = new Word2vec()
     parser.parse(args, defaultParams).map { param =>
       val conf = new SparkConf().setAppName("Node2Vec")
       if (useKyroSerializer) {
@@ -117,36 +115,38 @@ object Main {
         //      conf.registerKryoClasses(Array(classOf[Node2vec], classOf[Word2vec],
         // classOf[NodeAttr],
         //        classOf[EdgeAttr]))
-        conf.registerKryoClasses(Array(classOf[Node2vec], classOf[Word2vec], classOf[NodeAttr],
-          classOf[EdgeAttr], classOf[Params], classOf[Array[(Long, Double)]],
-          classOf[Array[Int]], classOf[Array[Long]]))
+        conf.registerKryoClasses(Array(
+          classOf[NodeAttr],
+          classOf[EdgeAttr],
+          classOf[Array[NodeAttr]],
+          classOf[Array[EdgeAttr]]))
         GraphXUtils.registerKryoClasses(conf)
       }
       val context: SparkContext = new SparkContext(conf)
 
       GraphOps.setup(context, param)
-      node2vec.setup(context, param)
-      word2vec.setup(context, param)
+      Node2vec.setup(context, param)
+      Word2vec.setup(context, param)
 
       param.cmd match {
         case Command.node2vec =>
           logger.warn("Loading graph...")
-          val graph = node2vec.loadGraph()
+          val graph = Node2vec.loadGraph()
           logger.warn("Starting random walk...")
-          val randomPaths: RDD[String] = node2vec.randomWalk(graph)
-          node2vec.save(randomPaths)
-          word2vec.readFromRdd(randomPaths).fit().save()
+          val randomPaths: RDD[String] = Node2vec.randomWalk(graph)
+          Node2vec.save(randomPaths)
+          Word2vec.readFromRdd(randomPaths).fit().save()
         case Command.randomwalk =>
           logger.warn("Loading graph...")
-          val graph = node2vec.loadGraph()
+          val graph = Node2vec.loadGraph()
           logger.warn("Starting random walk...")
-          val randomPaths: RDD[String] = node2vec.randomWalk(graph)
+          val randomPaths: RDD[String] = Node2vec.randomWalk(graph)
           logger.warn("Completed random walk...")
-          node2vec.save(randomPaths)
+          Node2vec.save(randomPaths)
 
         case Command.embedding => {
-          val randomPaths = word2vec.read(param.input)
-          word2vec.fit().save()
+          val randomPaths = Word2vec.read(param.input)
+          Word2vec.fit().save()
         }
       }
     } getOrElse {

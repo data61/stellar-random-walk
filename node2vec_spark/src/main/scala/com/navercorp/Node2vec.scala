@@ -83,7 +83,7 @@ class Node2vec extends Serializable {
           bcMaxDegree.value)
       }
 
-      (srcId, NodeAttr(neighbors = neighbors_))
+      (srcId, new NodeAttr(neighbors = neighbors_))
     }.repartition(partitions).cache
 
 
@@ -92,7 +92,7 @@ class Node2vec extends Serializable {
     // Repartition shuffles tO(m)
     val edge2attr = node2attr.flatMap { case (srcId, clickNode) =>
       clickNode.neighbors.map { case (dstId, weight) =>
-        Edge(srcId, dstId, EdgeAttr())
+        Edge(srcId, dstId, new EdgeAttr())
       }
     }.repartition(partitions).cache
 

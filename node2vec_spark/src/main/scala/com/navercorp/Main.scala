@@ -112,14 +112,15 @@ object Main {
       val conf = new SparkConf().setAppName("Node2Vec")
       if (useKyroSerializer) {
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-        conf.set("spark.kryo.registrator", "com.navercorp.MyRegistrator")
+        //        conf.set("spark.kryo.registrator", "com.navercorp.MyRegistrator")
         conf.set("spark.kryo.registrationRequired", "true")
         //      conf.registerKryoClasses(Array(classOf[Node2vec], classOf[Word2vec],
         // classOf[NodeAttr],
         //        classOf[EdgeAttr]))
+        conf.registerKryoClasses(Array(classOf[Node2vec], classOf[Word2vec], classOf[NodeAttr],
+          classOf[EdgeAttr], classOf[Params], classOf[Array[(Long, Double)]],
+          classOf[Array[Int]], classOf[Array[Long]]))
         GraphXUtils.registerKryoClasses(conf)
-//        conf.registerKryoClasses(Array(classOf[Node2vec], classOf[Word2vec], classOf[NodeAttr],
-//          classOf[EdgeAttr], classOf[Params]))
       }
       val context: SparkContext = new SparkContext(conf)
 
@@ -154,12 +155,12 @@ object Main {
   }
 }
 
-class MyRegistrator extends KryoRegistrator {
-  override def registerClasses(kryo: Kryo) {
-    kryo.register(classOf[Node2vec])
-    kryo.register(classOf[Word2vec])
-    kryo.register(classOf[NodeAttr])
-    kryo.register(classOf[EdgeAttr])
-    kryo.register(classOf[Params])
-  }
-}
+//class MyRegistrator extends KryoRegistrator {
+//  override def registerClasses(kryo: Kryo) {
+//    kryo.register(classOf[Node2vec])
+//    kryo.register(classOf[Word2vec])
+//    kryo.register(classOf[NodeAttr])
+//    kryo.register(classOf[EdgeAttr])
+//    kryo.register(classOf[Params])
+//  }
+//}

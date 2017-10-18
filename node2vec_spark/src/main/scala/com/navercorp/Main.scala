@@ -2,18 +2,22 @@ package com.navercorp
 
 import java.io.Serializable
 
-import com.navercorp.Node2vec.getClass
+import com.navercorp.Main.Params
 import com.navercorp.graph.GraphOps
 import org.apache.spark.{SparkConf, SparkContext}
 import scopt.OptionParser
 import com.navercorp.lib.AbstractParams
 import org.apache.log4j.LogManager
 import org.apache.spark.rdd.RDD
-import org.slf4j.{Logger, LoggerFactory}
+import com.navercorp.graph.{EdgeAttr, NodeAttr}
+import com.twitter.chill.Kryo
+import org.apache.spark.graphx.GraphXUtils
+import org.apache.spark.serializer.KryoRegistrator
 
 object Main {
   //  lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   lazy val logger = LogManager.getLogger("myLogger")
+  val useKyroSerializer: Boolean = true
 
   object Command extends Enumeration {
     type Command = Value
@@ -102,37 +106,60 @@ object Main {
   }
 
   def main(args: Array[String]) {
+    val node2vec = new Node2vec()
+    val word2vec = new Word2vec()
     parser.parse(args, defaultParams).map { param =>
       val conf = new SparkConf().setAppName("Node2Vec")
+      if (useKyroSerializer) {
+        conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        conf.set("spark.kryo.registrator", "com.navercorp.MyRegistrator")
+        conf.set("spark.kryo.registrationRequired", "true")
+        //      conf.registerKryoClasses(Array(classOf[Node2vec], classOf[Word2vec],
+        // classOf[NodeAttr],
+        //        classOf[EdgeAttr]))
+        GraphXUtils.registerKryoClasses(conf)
+//        conf.registerKryoClasses(Array(classOf[Node2vec], classOf[Word2vec], classOf[NodeAttr],
+//          classOf[EdgeAttr], classOf[Params]))
+      }
       val context: SparkContext = new SparkContext(conf)
 
       GraphOps.setup(context, param)
-      Node2vec.setup(context, param)
-      Word2vec.setup(context, param)
+      node2vec.setup(context, param)
+      word2vec.setup(context, param)
 
       param.cmd match {
         case Command.node2vec =>
           logger.warn("Loading graph...")
-          val graph = Node2vec.loadGraph()
+          val graph = node2vec.loadGraph()
           logger.warn("Starting random walk...")
-          val randomPaths: RDD[String] = Node2vec.randomWalk(graph)
-          Node2vec.save(randomPaths)
-          Word2vec.readFromRdd(randomPaths).fit().save()
+          val randomPaths: RDD[String] = node2vec.randomWalk(graph)
+          node2vec.save(randomPaths)
+          word2vec.readFromRdd(randomPaths).fit().save()
         case Command.randomwalk =>
           logger.warn("Loading graph...")
-          val graph = Node2vec.loadGraph()
+          val graph = node2vec.loadGraph()
           logger.warn("Starting random walk...")
-          val randomPaths: RDD[String] = Node2vec.randomWalk(graph)
+          val randomPaths: RDD[String] = node2vec.randomWalk(graph)
           logger.warn("Completed random walk...")
-          Node2vec.save(randomPaths)
+          node2vec.save(randomPaths)
 
         case Command.embedding => {
-          val randomPaths = Word2vec.read(param.input)
-          Word2vec.fit().save()
+          val randomPaths = word2vec.read(param.input)
+          word2vec.fit().save()
         }
       }
     } getOrElse {
       sys.exit(1)
     }
+  }
+}
+
+class MyRegistrator extends KryoRegistrator {
+  override def registerClasses(kryo: Kryo) {
+    kryo.register(classOf[Node2vec])
+    kryo.register(classOf[Word2vec])
+    kryo.register(classOf[NodeAttr])
+    kryo.register(classOf[EdgeAttr])
+    kryo.register(classOf[Params])
   }
 }

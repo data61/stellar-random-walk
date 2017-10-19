@@ -28,7 +28,7 @@ object Main {
 
   case class Params(iter: Int = 10,
                     lr: Double = 0.025,
-                    numPartition: Int = 10,
+                    w2vPartitions: Int = 10,
                     dim: Int = 128,
                     window: Int = 10,
                     walkLength: Int = 80,
@@ -43,6 +43,7 @@ object Main {
                     input: String = null,
                     output: String = null,
                     useKyroSerializer: Boolean = false,
+                    rddPartitions: Int = 200,
                     cmd: Command = Command.node2vec) extends AbstractParams[Params] with
     Serializable
 
@@ -62,6 +63,9 @@ object Main {
     opt[Double]("q")
       .text(s"in-out parameter q: ${defaultParams.q}")
       .action((x, c) => c.copy(q = x))
+    opt[Int]("rddPartitions")
+      .text(s"Number of RDD partitions in running Random Walk and Word2vec: ${defaultParams.rddPartitions}")
+      .action((x, c) => c.copy(rddPartitions = x))
     opt[Boolean]("weighted")
       .text(s"weighted: ${defaultParams.weighted}")
       .action((x, c) => c.copy(weighted = x))
@@ -77,6 +81,9 @@ object Main {
     opt[String]("nodePath")
       .text("Input node2index file path: empty")
       .action((x, c) => c.copy(nodePath = x))
+    opt[Int]("w2vPartitions")
+      .text(s"Number of partitions in word2vec: ${defaultParams.w2vPartitions}")
+      .action((x, c) => c.copy(w2vPartitions = x))
     opt[String]("input")
       .required()
       .text("Input edge file path: empty")
@@ -100,7 +107,7 @@ object Main {
       """.stripMargin +
         s"|   --lr ${defaultParams.lr}" +
         s"|   --iter ${defaultParams.iter}" +
-        s"|   --numPartition ${defaultParams.numPartition}" +
+        s"|   --w2vPartition ${defaultParams.w2vPartitions}" +
         s"|   --dim ${defaultParams.dim}" +
         s"|   --window ${defaultParams.window}" +
         s"|   --input <path>" +
@@ -130,16 +137,12 @@ object Main {
 
       param.cmd match {
         case Command.node2vec =>
-          logger.warn("Loading graph...")
           val graph = Node2vec.loadGraph()
-          logger.warn("Starting random walk...")
           val randomPaths: RDD[String] = Node2vec.randomWalk(graph)
           Node2vec.save(randomPaths)
           Word2vec.readFromRdd(randomPaths).fit().save()
         case Command.randomwalk =>
-          logger.warn("Loading graph...")
           val graph = Node2vec.loadGraph()
-          logger.warn("Starting random walk...")
           val randomPaths: RDD[String] = Node2vec.randomWalk(graph)
           logger.warn("Completed random walk...")
           Node2vec.save(randomPaths)

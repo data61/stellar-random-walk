@@ -26,7 +26,7 @@ object Word2vec extends Serializable {
       */
     word2vec.setLearningRate(param.lr)
             .setNumIterations(param.iter)
-            .setNumPartitions(param.numPartition)
+            .setNumPartitions(param.w2vPartitions)
             .setMinCount(0)
             .setVectorSize(param.dim)
 
@@ -38,7 +38,7 @@ object Word2vec extends Serializable {
   }
   
   def read(path: String): this.type = {
-    examples = context.textFile(path).repartition(200).map (_.split ("\\s").toIterable)
+    examples = context.textFile(path).repartition(config.rddPartitions).map (_.split ("\\s").toIterable)
     this
   }
   def readFromRdd(randomPaths: RDD[String]): this.type = {

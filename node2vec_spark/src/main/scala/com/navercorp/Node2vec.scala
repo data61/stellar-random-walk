@@ -16,7 +16,6 @@ import com.navercorp.common.Property
 object Node2vec extends Serializable {
 //  lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   lazy val logger = LogManager.getLogger("myLogger")
-  val partitions = 20
   var context: SparkContext = _
   var config: Main.Params = _
   var label2id: RDD[(String, Long)] = _ // a label per node id?
@@ -84,7 +83,7 @@ object Node2vec extends Serializable {
       }
 
       (srcId, NodeAttr(neighbors = neighbors_))
-    }.repartition(partitions).cache
+    }.repartition(config.rddPartitions).cache
 
 
     // Creates an Array of GraphX Edge objects with the EdgeAttr objects attached to each edge
@@ -94,7 +93,7 @@ object Node2vec extends Serializable {
       clickNode.neighbors.map { case (dstId, weight) =>
         Edge(srcId, dstId, EdgeAttr())
       }
-    }.repartition(partitions).cache
+    }.repartition(config.rddPartitions).cache
 
     // This returns an object of graphx Graph class
     GraphOps.initTransitionProb(node2attr, edge2attr)
@@ -105,7 +104,7 @@ object Node2vec extends Serializable {
     // on hash of srcIdDstId.
     val edge2attr = g.triplets.map { edgeTriplet =>
       (s"${edgeTriplet.srcId}${edgeTriplet.dstId}", edgeTriplet.attr)
-    }.reduceByKey { case (l, r) => l }.partitionBy(new HashPartitioner(partitions)).persist(StorageLevel
+    }.reduceByKey { case (l, r) => l }.partitionBy(new HashPartitioner(config.rddPartitions)).persist(StorageLevel
       .MEMORY_ONLY) // What is actually reducebykey doing?
     logger.info(s"edge2attr: ${edge2attr.count}")
 
@@ -210,7 +209,7 @@ object Node2vec extends Serializable {
 
   def save(randomPaths: RDD[String]): this.type = {
     randomPaths.filter(x => x != null && x.replaceAll("\\s", "").length > 0)
-      .repartition(partitions)
+      .repartition(config.rddPartitions)
       .saveAsTextFile(s"${config.output}.${Property.pathSuffix}")
 
     if (Some(this.label2id).isDefined) {

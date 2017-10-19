@@ -14,6 +14,7 @@ import numpy as np
 import networkx as nx
 import node2vec
 from gensim.models import Word2Vec
+import time
 
 def parse_args():
 	'''
@@ -89,6 +90,7 @@ def learn_embeddings(walks):
 	
 	return
 
+
 def main(args):
 	'''
 	Pipeline for representational learning for all nodes in a graph.
@@ -97,8 +99,10 @@ def main(args):
 	G = node2vec.Graph(nx_G, args.directed, args.p, args.q)
 	G.preprocess_transition_probs()
 	walks = G.simulate_walks(args.num_walks, args.walk_length)
-	learn_embeddings(walks)
+	# learn_embeddings(walks)
 
 if __name__ == "__main__":
+	start_time = time.time()
 	args = parse_args()
 	main(args)
+	print("--- %s seconds ---" % (time.time() - start_time))

@@ -212,7 +212,7 @@ object Node2vec extends Serializable {
       .repartition(config.rddPartitions)
       .saveAsTextFile(s"${config.output}.${Property.pathSuffix}")
 
-    if (Some(this.label2id).isDefined) {
+    if (!config.indexed && Some(this.label2id).isDefined) {
       label2id.map { case (label, id) =>
         s"$label\t$id"
       }.saveAsTextFile(s"${config.output}.${Property.node2idSuffix}")

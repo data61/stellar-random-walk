@@ -104,8 +104,9 @@ object Node2vec extends Serializable {
     // on hash of srcIdDstId.
     val edge2attr = g.triplets.map { edgeTriplet =>
       (s"${edgeTriplet.srcId}${edgeTriplet.dstId}", edgeTriplet.attr)
-    }.reduceByKey { case (l, r) => l }.partitionBy(new HashPartitioner(config.rddPartitions)).persist(StorageLevel
-      .MEMORY_ONLY) // What is actually reducebykey doing?
+    }.partitionBy(new HashPartitioner(config.rddPartitions)).persist(StorageLevel
+      .MEMORY_ONLY)
+
     logger.info(s"edge2attr: ${edge2attr.count}")
 
     val examples = g.vertices.cache // Why is it called examples?

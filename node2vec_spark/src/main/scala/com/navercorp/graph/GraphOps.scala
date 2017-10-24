@@ -1,10 +1,12 @@
 package com.navercorp.graph
 
 import scala.collection.mutable.ArrayBuffer
-import org.apache.spark.SparkContext
-import org.apache.spark.graphx.{EdgeTriplet, Graph, Edge, _}
+import org.apache.spark.{HashPartitioner, SparkContext}
+import org.apache.spark.graphx.{Edge, EdgeTriplet, Graph, _}
 import org.apache.spark.rdd.RDD
 import com.navercorp.Main
+import com.navercorp.Node2vec.{config, logger}
+import org.apache.spark.storage.StorageLevel
 
 object GraphOps {
   var context: SparkContext = _
@@ -113,7 +115,8 @@ object GraphOps {
     // random walk for initialization.
     val graph = Graph(indexedNodes, indexedEdges).mapVertices[NodeAttr] { case (vertexId,
     nodeAttr) =>
-      /* For each vertex create alias and prob arrays. This is done by giving the set of items.*/
+      /* For each vertex create alias and prob arrays. This is done by giving the set of
+ items.*/
       val (j, q) = GraphOps.setupAlias(nodeAttr.neighbors)
       val nextNodeIndex = GraphOps.drawAlias(j, q) // selects a random node from the neighbors
       // according to their weights
@@ -127,10 +130,14 @@ object GraphOps {
 
       edgeTriplet.attr.J = j // alias array
       edgeTriplet.attr.q = q // prob array
-      edgeTriplet.attr.dstNeighbors = edgeTriplet.dstAttr.neighbors.map(_._1) // Removing the weights from dst attribute?
+      edgeTriplet.attr.dstNeighbors = edgeTriplet.dstAttr.neighbors.map(_._1) // Removing the
+      // weights from dst attribute?
 
       edgeTriplet.attr
-    }.cache
+    }
+
+    logger.info(s"examples: ${graph.vertices.count}")
+    logger.info(s"edges: ${graph.edges.count}")
 
     graph
   }

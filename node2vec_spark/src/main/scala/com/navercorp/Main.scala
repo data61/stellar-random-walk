@@ -157,13 +157,3 @@ object Main {
     }
   }
 }
-
-//class MyRegistrator extends KryoRegistrator {
-//  override def registerClasses(kryo: Kryo) {
-//    kryo.register(classOf[Node2vec])
-//    kryo.register(classOf[Word2vec])
-//    kryo.register(classOf[NodeAttr])
-//    kryo.register(classOf[EdgeAttr])
-//    kryo.register(classOf[Params])
-//  }
-//}

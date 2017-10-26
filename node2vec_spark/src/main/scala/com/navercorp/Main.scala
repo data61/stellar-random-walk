@@ -15,13 +15,11 @@ import org.apache.spark.graphx.GraphXUtils
 import org.apache.spark.serializer.KryoRegistrator
 
 object Main {
-  //  lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   lazy val logger = LogManager.getLogger("myLogger")
-//  val useKyroSerializer: Boolean = false
 
   object Command extends Enumeration {
     type Command = Value
-    val node2vec, randomwalk, embedding = Value
+    val node2vec, o_randomwalk, s_randomwalk, embedding = Value
   }
 
   import Command._
@@ -64,7 +62,10 @@ object Main {
       .text(s"in-out parameter q: ${defaultParams.q}")
       .action((x, c) => c.copy(q = x))
     opt[Int]("rddPartitions")
-      .text(s"Number of RDD partitions in running Random Walk and Word2vec: ${defaultParams.rddPartitions}")
+      .text(s"Number of RDD partitions in running Random Walk and Word2vec: ${
+        defaultParams
+          .rddPartitions
+      }")
       .action((x, c) => c.copy(rddPartitions = x))
     opt[Boolean]("weighted")
       .text(s"weighted: ${defaultParams.weighted}")
@@ -131,25 +132,28 @@ object Main {
       }
       val context: SparkContext = new SparkContext(conf)
 
-      GraphOps.setup(context, param)
-      Node2vec.setup(context, param)
-      Word2vec.setup(context, param)
-
       param.cmd match {
         case Command.node2vec =>
-          val graph = Node2vec.loadGraph()
-          val randomPaths: RDD[String] = Node2vec.randomWalk(graph)
-          Node2vec.save(randomPaths)
-          Word2vec.readFromRdd(randomPaths).fit().save()
-        case Command.randomwalk =>
+        //          val graph = Node2vec.loadGraph()
+        //          val randomPaths: RDD[String] = Node2vec.randomWalk(graph)
+        //          Node2vec.save(randomPaths)
+        //          Word2vec.readFromRdd(randomPaths).fit().save()
+        case Command.s_randomwalk =>
+          RandomWalk.setup(context, param)
+          val graph = RandomWalk.loadGraph()
+          val paths = RandomWalk.randomWalk(graph)
+          RandomWalk.save(paths)
+        case Command.o_randomwalk =>
+          GraphOps.setup(context, param)
+          Node2vec.setup(context, param)
+          Word2vec.setup(context, param)
           val graph = Node2vec.loadGraph()
           val randomPaths: RDD[String] = Node2vec.randomWalk(graph)
           logger.warn("Completed random walk...")
           Node2vec.save(randomPaths)
-
         case Command.embedding => {
-          val randomPaths = Word2vec.read(param.input)
-          Word2vec.fit().save()
+          //          val randomPaths = Word2vec.read(param.input)
+          //          Word2vec.fit().save()
         }
       }
     } getOrElse {

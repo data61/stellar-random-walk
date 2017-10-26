@@ -24,12 +24,14 @@ object RandomWalk {
     this
   }
 
+
+
   /**
     * Loads the graph and computes the probabilities to go from each vertex to its neighbors
     *
     * @return
     */
-  def loadGraph() = {
+  def loadGraph():Graph[Array[Long], Double] = {
     // the directed and weighted parameters are only used for building the graph object.
     // is directed? they will be shared among stages and executors
     val bcDirected = context.broadcast(config.directed)

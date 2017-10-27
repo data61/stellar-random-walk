@@ -2,17 +2,13 @@ package com.navercorp
 
 import java.io.Serializable
 
-import com.navercorp.Main.Params
-import com.navercorp.graph.GraphOps
-import org.apache.spark.{SparkConf, SparkContext}
-import scopt.OptionParser
+import com.navercorp.graph.{EdgeAttr, GraphOps, NodeAttr}
 import com.navercorp.lib.AbstractParams
 import org.apache.log4j.LogManager
-import org.apache.spark.rdd.RDD
-import com.navercorp.graph.{EdgeAttr, NodeAttr}
-import com.twitter.chill.Kryo
 import org.apache.spark.graphx.GraphXUtils
-import org.apache.spark.serializer.KryoRegistrator
+import org.apache.spark.rdd.RDD
+import org.apache.spark.{SparkConf, SparkContext}
+import scopt.OptionParser
 
 object Main {
   lazy val logger = LogManager.getLogger("myLogger")
@@ -139,10 +135,10 @@ object Main {
         //          Node2vec.save(randomPaths)
         //          Word2vec.readFromRdd(randomPaths).fit().save()
         case Command.s_randomwalk =>
-          RandomWalk.setup(context, param)
-          val graph = RandomWalk.loadGraph()
-          val paths = RandomWalk.randomWalk(graph)
-          RandomWalk.save(paths)
+          val rw = RandomWalk(context, param)
+          val graph = rw.loadGraph()
+          val paths = rw.randomWalk(graph)
+          rw.save(paths)
         case Command.o_randomwalk =>
           GraphOps.setup(context, param)
           Node2vec.setup(context, param)

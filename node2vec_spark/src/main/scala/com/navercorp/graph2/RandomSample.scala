@@ -2,10 +2,9 @@ package com.navercorp.graph2
 
 import org.apache.spark.graphx.Edge
 
-object RandomSample extends Serializable {
+import scala.util.Random
 
-  // TODO define seed
-  // TODO Unit test
+case class RandomSample(nextDouble: () => Double = Random.nextDouble) extends Serializable {
 
   /**
     *
@@ -13,19 +12,34 @@ object RandomSample extends Serializable {
     * @return
     */
   final def sample(edges: Array[Edge[Double]]): Option[Edge[Double]] = {
-    val sum = edges.map(_.attr).sum
+    val weights = edges.map(_.attr)
+    resolveEdgeIndex(edges, sampleIndex(weights))
+  }
 
-    val p = scala.util.Random.nextDouble
-    val it = edges.iterator
+  private final def resolveEdgeIndex(edges: Array[Edge[Double]], index: Int)
+  : Option[Edge[Double]] = {
+    index match {
+      case -1 => None
+      case _ => Some(edges(index))
+    }
+  }
+
+  final def sampleIndex(weights: Array[Double]): Int = {
+    val sum = weights.sum
+
+    val p = nextDouble()
+    val it = weights.iterator
     var acc = 0.0
+    var i = 0
     while (it.hasNext) {
-      val e = it.next
-      acc += e.attr / sum
+      val w = it.next
+      acc += w / sum
       if (acc >= p)
-        return Some(e)
+        return i
+      i = i + 1
     }
 
-    None
+    return -1
   }
 
   /**
@@ -42,7 +56,17 @@ object RandomSample extends Serializable {
                                prevId: Long,
                                prevNeighbors: Array[Edge[Double]],
                                currNeighbors: Array[Edge[Double]]): Option[Edge[Double]] = {
-    val neighbors_ = currNeighbors.map { case (e: Edge[Double]) =>
+
+    val newWeights = computeSecondOrderWeights(p, q)(prevId, prevNeighbors, currNeighbors)
+    resolveEdgeIndex(currNeighbors, sampleIndex(newWeights))
+  }
+
+  final def computeSecondOrderWeights(p: Double = 1.0,
+                                      q: Double = 1.0)(
+                                       prevId: Long,
+                                       prevNeighbors: Array[Edge[Double]],
+                                       currNeighbors: Array[Edge[Double]]): Array[Double] = {
+    currNeighbors.map { case (e: Edge[Double]) =>
       var unnormProb = e.attr / q // Default is that there is no direct link between src and
       // dstNeighbor.
       if (e.dstId == prevId) unnormProb = e.attr / p // If the dstNeighbor is the src node.
@@ -50,8 +74,8 @@ object RandomSample extends Serializable {
       // direct link from src to neighborDst. Note, that the weight of the direct link is always
       // considered, which does not necessarily is the shortest path.
 
-      Edge(e.srcId, e.dstId, unnormProb)
+      unnormProb
     }
-    sample(neighbors_)
   }
+
 }

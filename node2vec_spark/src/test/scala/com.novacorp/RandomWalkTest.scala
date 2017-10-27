@@ -24,19 +24,23 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
 
   test("load graph as directed") {
     val config = Params(input = "./src/test/graph/karate.txt", directed = true)
-    RandomWalk.setup(sc, config)
-    val graph = RandomWalk.loadGraph()
-    assert(graph.edges.count() == 78)
-    assert(graph.vertices.count() == 34)
+    val rw = RandomWalk(sc, config)
+    val graph = rw.loadGraph()// loadGraph(int)
+
+    assert(graph.edges.count == 78)
+    assert(graph.vertices.count == 34)
   }
 
   test("load graph as undirected") {
     val config = Params(input = "./src/test/graph/karate.txt", directed = false)
-    RandomWalk.setup(sc, config)
-    val graph = RandomWalk.loadGraph()
+    val rw = RandomWalk(sc, config)
+    val graph = rw.loadGraph()
     assert(graph.edges.count() == 156)
     assert(graph.vertices.count() == 34)
   }
 
+  test("random walk") {
+
+  }
 
 }

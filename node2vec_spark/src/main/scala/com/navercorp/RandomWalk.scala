@@ -1,7 +1,7 @@
 package com.navercorp
 
 import com.navercorp.common.Property
-import com.navercorp.graph2.RandomSample._
+import com.navercorp.graph2.RandomSample
 import org.apache.log4j.LogManager
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, EdgeDirection, Graph, PartitionStrategy}
@@ -10,28 +10,18 @@ import org.apache.spark.storage.StorageLevel
 
 import scala.util.Try
 
-object RandomWalk {
+case class RandomWalk(context: SparkContext,
+                      config: Main.Params,
+                      sampler: RandomSample = RandomSample()) {
 
   lazy val logger = LogManager.getLogger("myLogger")
-  var context: SparkContext = _
-  var config: Main.Params = _
-  var label2id: RDD[(String, Long)] = _ // a label per node id?
-
-  def setup(context: SparkContext, param: Main.Params): this.type = {
-    this.context = context
-    this.config = param
-
-    this
-  }
-
-
 
   /**
     * Loads the graph and computes the probabilities to go from each vertex to its neighbors
     *
     * @return
     */
-  def loadGraph():Graph[Array[Long], Double] = {
+  def loadGraph(): Graph[Array[Long], Double] = {
     // the directed and weighted parameters are only used for building the graph object.
     // is directed? they will be shared among stages and executors
     val bcDirected = context.broadcast(config.directed)
@@ -70,26 +60,29 @@ object RandomWalk {
     val bcP = context.broadcast(config.p)
     val bcQ = context.broadcast(config.q)
 
+
     // initialize the first step of the random walk
     var v2p = g.collectEdges(EdgeDirection.Out).join(g.vertices).map { case (currId: Long,
     (currNeighbors: Array[Edge[Double]], path: Array[Long])) =>
-      sample(currNeighbors) match {
-        case Some(newStep) => (newStep.dstId, ((currId, currNeighbors), path ++ Array(currId,
-          newStep.dstId)))
+      sampler.sample(currNeighbors) match {
+        case Some(newStep) => (newStep.dstId, ((currId, currNeighbors), path
+          ++ Array(currId, newStep.dstId)))
         case None => (currId, ((currId, currNeighbors), path ++ Array(currId))) // This can be
         // filtered in future.
       }
     }.cache()
 
+    //    (0 until config.walkLength).map { walkCount => }
     for (walkCount <- 0 until config.walkLength) {
       v2p = g.collectEdges(EdgeDirection.Out).join(v2p).map { case (currId, (currNeighbors, (
         (prevId, prevNeighbors), path))) =>
         if (currId == prevId)
           (currId, ((currId, currNeighbors), path)) // This can be more optimized
         else
-          secondOrderSample(bcP.value, bcQ.value)(prevId, prevNeighbors, currNeighbors) match {
-            case Some(newStep) => (newStep.dstId, ((currId, currNeighbors), path ++ Array(newStep
-              .dstId)))
+          sampler.secondOrderSample(bcP.value, bcQ.value)(prevId, prevNeighbors, currNeighbors)
+          match {
+            case Some(newStep) => (newStep.dstId, ((currId, currNeighbors),
+              path ++ Array(newStep.dstId)))
             case None => (currId, ((currId, currNeighbors), path)) // This can be
             // filtered in future.
           }

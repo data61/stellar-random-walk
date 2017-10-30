@@ -54,7 +54,7 @@ case class RandomSample(nextDouble: () => Double = Random.nextDouble) extends Se
   final def secondOrderSample(p: Double = 1.0,
                               q: Double = 1.0)(
                                prevId: Long,
-                               prevNeighbors: Array[Edge[Double]],
+                               prevNeighbors: Option[Array[Edge[Double]]],
                                currNeighbors: Array[Edge[Double]]): Option[Edge[Double]] = {
 
     val newWeights = computeSecondOrderWeights(p, q)(prevId, prevNeighbors, currNeighbors)
@@ -64,18 +64,23 @@ case class RandomSample(nextDouble: () => Double = Random.nextDouble) extends Se
   final def computeSecondOrderWeights(p: Double = 1.0,
                                       q: Double = 1.0)(
                                        prevId: Long,
-                                       prevNeighbors: Array[Edge[Double]],
+                                       prevNeighbors: Option[Array[Edge[Double]]],
                                        currNeighbors: Array[Edge[Double]]): Array[Double] = {
     currNeighbors.map { case (e: Edge[Double]) =>
       var unnormProb = e.attr / q // Default is that there is no direct link between src and
       // dstNeighbor.
       if (e.dstId == prevId) unnormProb = e.attr / p // If the dstNeighbor is the src node.
-      else if (prevNeighbors.exists(_.dstId == e.dstId)) unnormProb = e.attr // If there is a
-      // direct link from src to neighborDst. Note, that the weight of the direct link is always
-      // considered, which does not necessarily is the shortest path.
-
+      else {
+        prevNeighbors match {
+          case Some(edges) =>
+            if ((edges.exists(_.dstId == e.dstId))) unnormProb = e.attr
+        }
+      }
       unnormProb
-    }
+    } // If there is a
+    // direct link from src to neighborDst. Note, that the weight of the direct link is always
+    // considered, which does not necessarily is the shortest path.
+
   }
 
 }

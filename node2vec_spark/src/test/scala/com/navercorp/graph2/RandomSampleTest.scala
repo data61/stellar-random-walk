@@ -40,7 +40,7 @@ class RandomSampleTest extends FunSuite {
     val e15 = Edge(1, 5, w1)
 
     val prevId = 1
-    var prevNeighbors = Array(e12, e14, e15)
+    var prevNeighbors = Some(Array(e12, e14, e15))
     val currNeighbors = Array(e21, e23, e24)
     var p = 1.0
     var q = 1.0
@@ -63,12 +63,12 @@ class RandomSampleTest extends FunSuite {
 
     p = 2.0
     q = 2.0
-    prevNeighbors = Array(e12, e15)
+    prevNeighbors = Some(Array(e12, e15))
 
     biasedWeights = random.computeSecondOrderWeights(p, q)(prevId, prevNeighbors, currNeighbors)
     assert(biasedWeights sameElements Array(w1 / p, w1 / q, w1 / q))
 
-    prevNeighbors = Array(e12, e14, e15)
+    prevNeighbors = Some(Array(e12, e14, e15))
     rValue = 0.24
     random = RandomSample(nextDouble = () => rValue)
     biasedWeights = random.computeSecondOrderWeights(p, q)(prevId, prevNeighbors, currNeighbors)

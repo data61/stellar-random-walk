@@ -8,11 +8,10 @@ import org.apache.spark.graphx.{Edge, EdgeDirection, Graph, PartitionStrategy}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
-import scala.util.Try
+import scala.util.{Random, Try}
 
 case class RandomWalk(context: SparkContext,
-                      config: Main.Params,
-                      sampler: RandomSample = RandomSample()) {
+                      config: Main.Params) extends Serializable {
 
   lazy val logger = LogManager.getLogger("myLogger")
 
@@ -29,7 +28,7 @@ case class RandomWalk(context: SparkContext,
     // inputTriplets is an array of edges (src, dst, weight).
 
     val edges: RDD[Edge[Double]] = context.textFile(config.input).flatMap { triplet =>
-      val parts = triplet.split("\\s")
+      val parts = triplet.split("\\s+")
       // if the weights are not specified it sets it to 1.0
       val weight = bcWeighted.value match {
         case true => Try(parts.last.toDouble).getOrElse(1.0)
@@ -56,48 +55,72 @@ case class RandomWalk(context: SparkContext,
     graph
   }
 
-  def randomWalk(g: Graph[Array[Long], Double]): RDD[String] = {
+  def randomWalk(g: Graph[Array[Long], Double], nextDoubleGen: () => Double = Random.nextDouble)
+  : RDD[Array[Long]] = {
     val bcP = context.broadcast(config.p)
     val bcQ = context.broadcast(config.q)
-
-
+    val walkLength = context.broadcast(config.walkLength).value
+    //    val nextDouble = context.broadcast(nextDoubleGen).value
     // initialize the first step of the random walk
-    var v2p = g.collectEdges(EdgeDirection.Out).join(g.vertices).map { case (currId: Long,
-    (currNeighbors: Array[Edge[Double]], path: Array[Long])) =>
-      sampler.sample(currNeighbors) match {
-        case Some(newStep) => (newStep.dstId, ((currId, currNeighbors), path
-          ++ Array(currId, newStep.dstId)))
-        case None => (currId, ((currId, currNeighbors), path ++ Array(currId))) // This can be
-        // filtered in future.
-      }
-    }.cache()
+    var v2p = doFirsStepOfRandomWalk(g, nextDoubleGen).cache()
 
-    //    (0 until config.walkLength).map { walkCount => }
-    for (walkCount <- 0 until config.walkLength) {
-      v2p = g.collectEdges(EdgeDirection.Out).join(v2p).map { case (currId, (currNeighbors, (
+    for (walkCount <- 0 until walkLength) {
+      v2p = g.collectEdges(EdgeDirection.Out).rightOuterJoin(v2p).map { case (currId,
+      (currNeighbors, (
         (prevId, prevNeighbors), path))) =>
         if (currId == prevId)
           (currId, ((currId, currNeighbors), path)) // This can be more optimized
-        else
-          sampler.secondOrderSample(bcP.value, bcQ.value)(prevId, prevNeighbors, currNeighbors)
-          match {
-            case Some(newStep) => (newStep.dstId, ((currId, currNeighbors),
-              path ++ Array(newStep.dstId)))
-            case None => (currId, ((currId, currNeighbors), path)) // This can be
-            // filtered in future.
+        else {
+          currNeighbors match {
+            case Some(edges) =>
+              RandomSample(nextDoubleGen).secondOrderSample(bcP.value, bcQ.value)(prevId,
+                prevNeighbors,
+                edges)
+              match {
+                case Some(newStep) => (newStep.dstId, ((currId, currNeighbors),
+                  path ++ Array(newStep.dstId)))
+                //                case None => (currId, ((currId, currNeighbors), path)) // This
+                // can be
+
+                //                // filtered in future.
+              }
+            case None => (currId, ((currId, currNeighbors), path))
           }
+        }
       }.cache()
     }
 
 
     v2p.map { case (_, ((_, _), path)) =>
-      val pathString = path.mkString("\t")
-      s"$pathString"
+      path
     }
   }
 
-  def save(paths: RDD[String]) = {
-    paths.repartition(numPartitions = config.rddPartitions).saveAsTextFile(s"${config.output}" +
+  def doFirsStepOfRandomWalk(g: Graph[Array[Long], Double], nextDouble: () => Double = Random
+    .nextDouble): RDD[(Long,
+    ((Long, Option[Array[Edge[Double]]]), Array[Long]))] = {
+    g.collectEdges(EdgeDirection.Out).rightOuterJoin(g.vertices).map { case (currId: Long,
+    (currNeighbors: Option[Array[Edge[Double]]], path: Array[Long])) =>
+      currNeighbors match {
+        case Some(edges) =>
+          RandomSample(nextDouble).sample(edges) match {
+            case Some(newStep) => (newStep.dstId, ((currId, Some(edges)), path
+              ++ Array(currId, newStep.dstId)))
+            //            case None => (currId, ((currId, edges), path ++ Array(currId))) // This
+            // can be
+            // filtered in future.
+          }
+        case None => (currId, ((currId, None), path ++ Array(currId)))
+      }
+    }
+  }
+
+  def save(paths: RDD[Array[Long]]) = {
+
+    paths.map { case (path) =>
+      val pathString = path.mkString("\t")
+      s"$pathString"
+    }.repartition(numPartitions = config.rddPartitions).saveAsTextFile(s"${config.output}" +
       s".${Property.pathSuffix}")
   }
 

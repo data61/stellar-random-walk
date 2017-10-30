@@ -1,10 +1,7 @@
-package com.novacorp
+package au.csiro.data61
 
-import com.navercorp.Main.Params
-import com.navercorp.RandomWalk
-import com.navercorp.graph2.RandomSample
-import org.apache.spark.graphx.{Edge, EdgeDirection, Graph, VertexRDD}
-import org.apache.spark.rdd.RDD
+import Main.Params
+import org.apache.spark.graphx.{Edge, EdgeDirection, Graph}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.BeforeAndAfter
 

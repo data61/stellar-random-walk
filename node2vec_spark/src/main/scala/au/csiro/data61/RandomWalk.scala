@@ -1,7 +1,6 @@
-package com.navercorp
+package au.csiro.data61
 
 import com.navercorp.common.Property
-import com.navercorp.graph2.RandomSample
 import org.apache.log4j.LogManager
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, EdgeDirection, Graph, PartitionStrategy}

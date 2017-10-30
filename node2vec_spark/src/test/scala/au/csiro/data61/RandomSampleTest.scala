@@ -1,4 +1,4 @@
-package com.navercorp.graph2
+package au.csiro.data61
 
 import org.apache.spark.graphx.Edge
 import org.scalatest.FunSuite

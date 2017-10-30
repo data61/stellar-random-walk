@@ -2,10 +2,10 @@ package com.navercorp
 
 import java.io.Serializable
 
+import au.csiro.data61.Main
 import org.apache.log4j.LogManager
 
 import scala.util.Try
-//import org.slf4j.{LoggerFactory, Logger}
 import org.apache.spark.{SparkContext, HashPartitioner}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.graphx.{Graph, _}
@@ -14,7 +14,6 @@ import com.navercorp.graph.{GraphOps, EdgeAttr, NodeAttr}
 import com.navercorp.common.Property
 
 object Node2vec extends Serializable {
-  //  lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   lazy val logger = LogManager.getLogger("myLogger")
   var context: SparkContext = _
   var config: Main.Params = _

@@ -1,9 +1,10 @@
-package com.navercorp
+package au.csiro.data61
 
 import java.io.Serializable
 
 import com.navercorp.graph.{EdgeAttr, GraphOps, NodeAttr}
 import com.navercorp.lib.AbstractParams
+import com.navercorp.{Node2vec, Word2vec}
 import org.apache.log4j.LogManager
 import org.apache.spark.graphx.GraphXUtils
 import org.apache.spark.rdd.RDD

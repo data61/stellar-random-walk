@@ -1,10 +1,11 @@
 package com.navercorp.graph
 
+import au.csiro.data61.Main
+
 import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.{HashPartitioner, SparkContext}
 import org.apache.spark.graphx.{Edge, EdgeTriplet, Graph, _}
 import org.apache.spark.rdd.RDD
-import com.navercorp.Main
 import com.navercorp.Node2vec.{config, logger}
 import org.apache.spark.storage.StorageLevel
 

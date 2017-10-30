@@ -2,7 +2,7 @@ package au.csiro.data61
 
 import com.navercorp.common.Property
 import org.apache.log4j.LogManager
-import org.apache.spark.SparkContext
+import org.apache.spark.{HashPartitioner, SparkContext}
 import org.apache.spark.graphx.{Edge, EdgeDirection, Graph, PartitionStrategy}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -61,10 +61,12 @@ case class RandomWalk(context: SparkContext,
     val walkLength = context.broadcast(config.walkLength).value
     //    val nextDouble = context.broadcast(nextDoubleGen).value
     // initialize the first step of the random walk
+
     var v2p = doFirsStepOfRandomWalk(g, nextDoubleGen).cache()
 
+    val v2e = g.collectEdges(EdgeDirection.Out).cache()
     for (walkCount <- 0 until walkLength) {
-      v2p = g.collectEdges(EdgeDirection.Out).rightOuterJoin(v2p).map { case (currId,
+      v2p = v2e.rightOuterJoin(v2p).map { case (currId,
       (currNeighbors, (
         (prevId, prevNeighbors), path))) =>
         if (currId == prevId)

@@ -3,7 +3,7 @@ package au.csiro.data61
 import com.navercorp.common.Property
 import org.apache.log4j.LogManager
 import org.apache.spark.{HashPartitioner, SparkContext}
-import org.apache.spark.graphx.{Edge, EdgeDirection, Graph, PartitionStrategy}
+import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
@@ -42,6 +42,8 @@ case class RandomWalk(context: SparkContext,
       }
     }
 
+    logger.info(bcDirected.value)
+    logger.info(edges.count())
     val graph: Graph[Array[Long], Double] = Graph.fromEdges(edges, defaultValue = Array.empty[Long],
       edgeStorageLevel =
         StorageLevel.MEMORY_ONLY, vertexStorageLevel = StorageLevel.MEMORY_ONLY).
@@ -54,6 +56,33 @@ case class RandomWalk(context: SparkContext,
     graph
   }
 
+  def doFirsStepOfRandomWalk(v2e: RDD[(VertexId, Array[Edge[Double]])], g: Graph[Array[Long],
+    Double], nextDouble: () => Double = Random.nextDouble): RDD[(Long,
+    ((Long, Option[Array[Edge[Double]]]), Array[Long]))] = {
+    v2e.rightOuterJoin(g.vertices).mapPartitions(iter => {
+      iter.map {
+        case (currId: Long,
+        (currNeighbors: Option[Array[Edge[Double]]], path: Array[Long])) =>
+          currNeighbors match {
+            case Some(edges) =>
+              RandomSample(nextDouble).sample(edges) match {
+                case Some(newStep) => (newStep.dstId, ((currId, Some(edges)), path
+                  ++ Array(currId, newStep.dstId)))
+                //            case None => (currId, ((currId, edges), path ++ Array(currId))) //
+                // This
+
+                // can be
+                // filtered in future.
+              }
+            case None => (currId, ((currId, None), path ++ Array(currId)))
+          }
+      }
+    }
+      , preservesPartitioning = false
+    )
+  }
+
+
   def randomWalk(g: Graph[Array[Long], Double], nextDoubleGen: () => Double = Random.nextDouble)
   : RDD[Array[Long]] = {
     val bcP = context.broadcast(config.p)
@@ -62,67 +91,61 @@ case class RandomWalk(context: SparkContext,
     //    val nextDouble = context.broadcast(nextDoubleGen).value
     // initialize the first step of the random walk
 
-    var v2p = doFirsStepOfRandomWalk(g, nextDoubleGen).cache()
-
-    val v2e = g.collectEdges(EdgeDirection.Out).cache()
+    val v2e = g.collectEdges(EdgeDirection.Out).partitionBy(new HashPartitioner(config
+      .rddPartitions)).cache()
+    //    val v2e = g.collectEdges(EdgeDirection.Out).repartition(config.rddPartitions).cache()
+    var v2p = doFirsStepOfRandomWalk(v2e, g, nextDoubleGen)
+      .repartition(config.rddPartitions)
+      .cache()
     for (walkCount <- 0 until walkLength) {
-      v2p = v2e.rightOuterJoin(v2p).map { case (currId,
-      (currNeighbors, (
-        (prevId, prevNeighbors), path))) =>
-        if (currId == prevId)
-          (currId, ((currId, currNeighbors), path)) // This can be more optimized
-        else {
-          currNeighbors match {
-            case Some(edges) =>
-              RandomSample(nextDoubleGen).secondOrderSample(bcP.value, bcQ.value)(prevId,
-                prevNeighbors,
-                edges)
-              match {
-                case Some(newStep) => (newStep.dstId, ((currId, currNeighbors),
-                  path ++ Array(newStep.dstId)))
-                //                case None => (currId, ((currId, currNeighbors), path)) // This
-                // can be
+      v2p = v2e.rightOuterJoin(v2p).mapPartitions(iter => {
+        iter.map {
+          case (currId,
+          (currNeighbors, (
+            (prevId, prevNeighbors), path))) =>
+            if (currId == prevId)
+              (currId, ((currId, currNeighbors), path)) // This can be more optimized
+            else {
+              currNeighbors match {
+                case Some(edges) =>
+                  RandomSample(nextDoubleGen).secondOrderSample(bcP.value, bcQ.value)(prevId,
+                    prevNeighbors,
+                    edges)
+                  match {
+                    case Some(newStep) => (newStep.dstId, ((currId, currNeighbors),
+                      path ++ Array(newStep.dstId)))
+                    //                case None => (currId, ((currId, currNeighbors), path)) // This
+                    // can be
 
-                //                // filtered in future.
+                    //                // filtered in future.
+                  }
+                case None => (currId, ((currId, currNeighbors), path))
+
               }
-            case None => (currId, ((currId, currNeighbors), path))
-          }
+            }
         }
-      }.cache()
+      }
+        , preservesPartitioning = false
+      ).cache()
     }
-
 
     v2p.map { case (_, ((_, _), path)) =>
       path
     }
   }
 
-  def doFirsStepOfRandomWalk(g: Graph[Array[Long], Double], nextDouble: () => Double = Random
-    .nextDouble): RDD[(Long,
-    ((Long, Option[Array[Edge[Double]]]), Array[Long]))] = {
-    g.collectEdges(EdgeDirection.Out).rightOuterJoin(g.vertices).map { case (currId: Long,
-    (currNeighbors: Option[Array[Edge[Double]]], path: Array[Long])) =>
-      currNeighbors match {
-        case Some(edges) =>
-          RandomSample(nextDouble).sample(edges) match {
-            case Some(newStep) => (newStep.dstId, ((currId, Some(edges)), path
-              ++ Array(currId, newStep.dstId)))
-            //            case None => (currId, ((currId, edges), path ++ Array(currId))) // This
-            // can be
-            // filtered in future.
-          }
-        case None => (currId, ((currId, None), path ++ Array(currId)))
-      }
-    }
-  }
-
   def save(paths: RDD[Array[Long]]) = {
 
-    paths.map { case (path) =>
-      val pathString = path.mkString("\t")
-      s"$pathString"
-    }.repartition(numPartitions = config.rddPartitions).saveAsTextFile(s"${config.output}" +
-      s".${Property.pathSuffix}")
+    paths.map {
+      case (path) =>
+        val pathString = path.mkString("\t")
+        s"$pathString"
+    }.repartition(numPartitions = config.rddPartitions).saveAsTextFile(s"${
+      config.output
+    }" +
+      s".${
+        Property.pathSuffix
+      }")
   }
 
 }

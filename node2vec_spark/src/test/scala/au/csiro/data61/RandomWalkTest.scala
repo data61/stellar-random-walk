@@ -7,7 +7,7 @@ import org.scalatest.BeforeAndAfter
 
 class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
 
-  private val master = "local"
+  private val master = "local[4]"
   private val appName = "rw-unit-test"
   private var sc: SparkContext = _
 
@@ -43,7 +43,7 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val config = Params(input = "./src/test/graph/testgraph.txt", directed = true)
     val rw = RandomWalk(sc, config)
     val graph = rw.loadGraph()
-    val result = rw.doFirsStepOfRandomWalk(graph)
+    val result = rw.doFirsStepOfRandomWalk(graph.collectEdges(EdgeDirection.Out), graph)
     val edges = graph.collectEdges(EdgeDirection.Out).collect()
     assert(result.count == graph.vertices.count())
     var curr = 2
@@ -70,7 +70,7 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     var wLength = 1
     var nextDoubleGen = () => rValue
     var config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
-      wLength)
+      wLength, rddPartitions = 8)
     var rw = RandomWalk(sc, config)
     var graph = rw.loadGraph()
     var paths = rw.randomWalk(graph, nextDoubleGen)
@@ -81,9 +81,9 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
       assert(p sameElements p2)
     }
 
-    wLength = 5
+    wLength = 50
     config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
-      wLength)
+      wLength, rddPartitions = 8)
     rw = RandomWalk(sc, config)
     graph = rw.loadGraph()
     paths = rw.randomWalk(graph, nextDoubleGen)
@@ -108,7 +108,7 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
 
     // Directed Graph
     config = Params(input = "./src/test/graph/karate.txt", directed = true, walkLength =
-      wLength)
+      wLength, rddPartitions = 8)
     rw = RandomWalk(sc, config)
     graph = rw.loadGraph()
     paths = rw.randomWalk(graph, nextDoubleGen)

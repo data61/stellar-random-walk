@@ -41,9 +41,7 @@ case class RandomWalk(context: SparkContext,
         Array(Edge(src, dst, weight), Edge(dst, src, weight))
       }
     }
-
-    logger.info(bcDirected.value)
-    logger.info(edges.count())
+    
     val graph: Graph[Array[Long], Double] = Graph.fromEdges(edges, defaultValue = Array.empty[Long],
       edgeStorageLevel =
         StorageLevel.MEMORY_ONLY, vertexStorageLevel = StorageLevel.MEMORY_ONLY).

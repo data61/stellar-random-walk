@@ -41,7 +41,7 @@ case class RandomWalk(context: SparkContext,
         Array(Edge(src, dst, weight), Edge(dst, src, weight))
       }
     }
-    
+
     val graph: Graph[Array[Long], Double] = Graph.fromEdges(edges, defaultValue = Array.empty[Long],
       edgeStorageLevel =
         StorageLevel.MEMORY_ONLY, vertexStorageLevel = StorageLevel.MEMORY_ONLY).
@@ -63,7 +63,7 @@ case class RandomWalk(context: SparkContext,
         (currNeighbors: Option[Array[Edge[Double]]], path: Array[Long])) =>
           currNeighbors match {
             case Some(edges) =>
-              RandomSample(nextDouble).sample(edges) match {
+               RandomSample(nextDouble).sample(edges) match {
                 case Some(newStep) => (newStep.dstId, ((currId, Some(edges)), path
                   ++ Array(currId, newStep.dstId)))
                 //            case None => (currId, ((currId, edges), path ++ Array(currId))) //

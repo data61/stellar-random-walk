@@ -16,6 +16,25 @@ case class RandomSample(nextDouble: () => Double = Random.nextDouble) extends Se
     resolveEdgeIndex(edges, sampleIndex(weights))
   }
 
+  /**
+    *
+    * @return
+    */
+  final def sample(edges: Array[(Long, Double)]): (Long, Double) = {
+
+    val sum = edges.foldLeft(0.0) { case (w1, (dstId, w2)) => w1 + w2 }
+
+    val p = nextDouble()
+    var acc = 0.0
+    for ((dstId, w) <- edges) {
+      acc += w / sum
+      if (acc >= p)
+        return (dstId, w)
+    }
+
+    edges.head
+  }
+
   private final def resolveEdgeIndex(edges: Array[Edge[Double]], index: Int)
   : Option[Edge[Double]] = {
     index match {

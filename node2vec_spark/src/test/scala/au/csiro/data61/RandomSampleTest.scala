@@ -30,6 +30,27 @@ class RandomSampleTest extends FunSuite {
     assert(random.sample(noNeighbors) == None)
   }
 
+  // TODO assert can move to a function for DRY purpose.
+  test("Test random sample2 function") {
+    var rValue = 0.1
+    var random = RandomSample(nextDouble = () => rValue)
+    assert(random.nextDouble() == rValue)
+    val e1 = (1L, 1.0)
+    val e2 = (2L, 1.0)
+    val e3 = (3L, 1.0)
+    val edges = Array(e1, e2, e3)
+    assert(random.sample(edges) == e1)
+    rValue = 0.4
+    random = RandomSample(nextDouble = () => rValue)
+    assert(random.sample(edges) == e2)
+    rValue = 0.7
+    random = RandomSample(nextDouble = () => rValue)
+    assert(random.sample(edges) == e3)
+    // Test an empty edge array
+    val noNeighbors = Array.empty[Edge[Double]]
+    assert(random.sample(noNeighbors) == None)
+  }
+
   test("Test second order random selection") {
     var w1 = 1.0
     val e12 = Edge(1, 2, w1)

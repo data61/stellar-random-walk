@@ -2,6 +2,7 @@ package au.csiro.data61
 
 import java.io.Serializable
 
+import au.csiro.data61.randomwalk.efficient.RandomWalk
 import com.navercorp.graph.{EdgeAttr, GraphOps, NodeAttr}
 import com.navercorp.lib.AbstractParams
 import com.navercorp.{Node2vec, Word2vec}
@@ -136,7 +137,7 @@ object Main {
         //          Node2vec.save(randomPaths)
         //          Word2vec.readFromRdd(randomPaths).fit().save()
         case Command.s_randomwalk =>
-          val rw = RandomWalk2(context, param)
+          val rw = RandomWalk(context, param)
           val graph = rw.loadGraph()
           val paths = rw.randomWalk(graph)
           rw.save(paths)

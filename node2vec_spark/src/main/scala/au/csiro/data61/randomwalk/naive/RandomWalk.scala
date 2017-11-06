@@ -1,11 +1,12 @@
-package au.csiro.data61
+package au.csiro.data61.randomwalk.naive
 
+import au.csiro.data61.Main
 import com.navercorp.common.Property
 import org.apache.log4j.LogManager
-import org.apache.spark.{HashPartitioner, SparkContext}
 import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.{HashPartitioner, SparkContext}
 
 import scala.util.{Random, Try}
 

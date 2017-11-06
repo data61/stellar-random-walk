@@ -1,5 +1,6 @@
-package au.csiro.data61
+package au.csiro.data61.randomwalk.efficient
 
+import au.csiro.data61.Main
 import com.navercorp.common.Property
 import org.apache.log4j.LogManager
 import org.apache.spark.graphx._
@@ -7,11 +8,11 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{HashPartitioner, SparkContext}
 
-import scala.util.{Random, Try}
 import scala.util.control.Breaks._
+import scala.util.{Random, Try}
 
-case class RandomWalk2(context: SparkContext,
-                       config: Main.Params) extends Serializable {
+case class RandomWalk(context: SparkContext,
+                      config: Main.Params) extends Serializable {
 
   lazy val logger = LogManager.getLogger("myLogger")
   val gMap = context.broadcast(GraphMap())
@@ -112,7 +113,7 @@ case class RandomWalk2(context: SparkContext,
               if (currNeighbors.length > 0) {
                 val prev = path(path.length - 2)
                 val prevNeighbors = map.getNeighbors(prev)
-                val (nextStep, _) = RandomSample(nextDouble).secondOrderSample2(bcP.value, bcQ
+                val (nextStep, _) = RandomSample(nextDouble).secondOrderSample(bcP.value, bcQ
                   .value, prev, prevNeighbors, currNeighbors)
                 path = path ++ Array(nextStep)
               } else {

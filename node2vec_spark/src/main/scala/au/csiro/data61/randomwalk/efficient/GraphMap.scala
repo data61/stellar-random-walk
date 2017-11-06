@@ -1,8 +1,8 @@
-package au.csiro.data61
+package au.csiro.data61.randomwalk.efficient
 
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
 
-import org.apache.spark.graphx.{Edge, VertexId}
+import org.apache.spark.graphx.Edge
 
 /**
   *

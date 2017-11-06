@@ -1,7 +1,8 @@
-package au.csiro.data61
+package au.csiro.data61.randomwalk.efficient
 
-import Main.Params
-import org.apache.spark.graphx.{Edge, EdgeDirection, Graph}
+import au.csiro.data61.Main.Params
+import au.csiro.data61.randomwalk.naive
+import org.apache.spark.graphx.{EdgeDirection, Graph}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.BeforeAndAfter
 
@@ -25,41 +26,38 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
   test("load graph as directed") {
     val config = Params(input = "./src/test/graph/karate.txt", directed = true)
     val rw = RandomWalk(sc, config)
-    val graph = rw.loadGraph() // loadGraph(int)
-
-    assert(graph.edges.count == 78)
-    assert(graph.vertices.count == 34)
+    val paths = rw.loadGraph()
+    val graph = rw.gMap
+    assert(graph.value.numEdges == 78)
+    assert(graph.value.numVertices == 34)
+    assert(paths.count() == 34)
   }
 
   test("load graph as undirected") {
     val config = Params(input = "./src/test/graph/karate.txt", directed = false)
     val rw = RandomWalk(sc, config)
-    val graph = rw.loadGraph()
-    assert(graph.edges.count() == 156)
-    assert(graph.vertices.count() == 34)
+    val paths = rw.loadGraph() // loadGraph(int)
+    val graph = rw.gMap.value
+    assert(graph.numEdges == 156)
+    assert(graph.numVertices == 34)
+    assert(paths.count() == 34)
   }
 
   test("the first step of Random Walk") {
     val config = Params(input = "./src/test/graph/testgraph.txt", directed = true)
     val rw = RandomWalk(sc, config)
-    val graph = rw.loadGraph()
-    val result = rw.doFirsStepOfRandomWalk(graph.collectEdges(EdgeDirection.Out), graph)
-    val edges = graph.collectEdges(EdgeDirection.Out).collect()
-    assert(result.count == graph.vertices.count())
-    var curr = 2
-    for (count <- 0 until 2) {
-      val ((prev: Long, prevNeighbors: Option[Array[Edge[Double]]]), path: Array[Long]) =
-        result.lookup(curr)(count)
-      prevNeighbors match {
-        case Some(edges) => {
-          assert(prev == 1)
-          assert(path sameElements Array(1L, 2L))
-        }
-        case None => {
-          assert(prev == 2)
-          assert(path sameElements Array(2L))
-        }
-        case _ => false
+    val paths = rw.loadGraph()
+    val result = rw.doFirsStepOfRandomWalk(paths)
+    assert(result.count == paths.count())
+    for (t <- result.collect()) {
+      val p = t._2
+      if (p.length == 2) {
+        assert(p.head == 1)
+        assert(p sameElements Array(1L, 2L))
+      }
+      else {
+        assert(p.head == 2)
+        assert(p sameElements Array(2L))
       }
     }
   }
@@ -75,9 +73,11 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     var graph = rw.loadGraph()
     var paths = rw.randomWalk(graph, nextDoubleGen)
     var rSampler = RandomSample(nextDoubleGen)
-    assert(paths.count() == graph.vertices.count()) // a path per vertex
-    paths.collect().foreach { (p: Array[Long]) =>
-      val p2 = doSecondOrderRandomWalk(graph, p(0), wLength, rSampler)
+    var nSampler = naive.RandomSample(nextDoubleGen)
+    assert(paths.count() == rw.gMap.value.numVertices) // a path per vertex
+    var baseRw = naive.RandomWalk(sc, config).loadGraph()
+    paths.collect().foreach { case (t: Long, p: Array[Long]) =>
+      val p2 = doSecondOrderRandomWalk(baseRw, p(0), wLength, nSampler)
       assert(p sameElements p2)
     }
 
@@ -88,9 +88,10 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     graph = rw.loadGraph()
     paths = rw.randomWalk(graph, nextDoubleGen)
     rSampler = RandomSample(nextDoubleGen)
-    assert(paths.count() == graph.vertices.count()) // a path per vertex
-    paths.collect().foreach { (p: Array[Long]) =>
-      val p2 = doSecondOrderRandomWalk(graph, p(0), wLength, rSampler)
+    assert(paths.count() == rw.gMap.value.numVertices) // a path per vertex
+    baseRw = naive.RandomWalk(sc, config).loadGraph()
+    paths.collect().foreach { case (t: Long, p: Array[Long]) =>
+      val p2 = doSecondOrderRandomWalk(baseRw, p(0), wLength, nSampler)
       assert(p sameElements p2)
     }
 
@@ -100,9 +101,10 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     graph = rw.loadGraph()
     paths = rw.randomWalk(graph, nextDoubleGen)
     rSampler = RandomSample(nextDoubleGen)
-    assert(paths.count() == graph.vertices.count()) // a path per vertex
-    paths.collect().foreach { (p: Array[Long]) =>
-      val p2 = doSecondOrderRandomWalk(graph, p(0), wLength, rSampler)
+    assert(paths.count() == rw.gMap.value.numVertices) // a path per vertex
+    baseRw = naive.RandomWalk(sc, config).loadGraph()
+    paths.collect().foreach { case (t: Long, p: Array[Long]) =>
+      val p2 = doSecondOrderRandomWalk(baseRw, p(0), wLength, nSampler)
       assert(p sameElements p2)
     }
 
@@ -113,9 +115,10 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     graph = rw.loadGraph()
     paths = rw.randomWalk(graph, nextDoubleGen)
     rSampler = RandomSample(nextDoubleGen)
-    assert(paths.count() == graph.vertices.count()) // a path per vertex
-    paths.collect().foreach { (p: Array[Long]) =>
-      val p2 = doSecondOrderRandomWalk(graph, p(0), wLength, rSampler)
+    assert(paths.count() == rw.gMap.value.numVertices) // a path per vertex
+    baseRw = naive.RandomWalk(sc, config).loadGraph()
+    paths.collect().foreach { case (t: Long, p: Array[Long]) =>
+      val p2 = doSecondOrderRandomWalk(baseRw, p(0), wLength, nSampler)
       assert(p sameElements p2)
     }
 
@@ -124,15 +127,18 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     graph = rw.loadGraph()
     paths = rw.randomWalk(graph, nextDoubleGen)
     rSampler = RandomSample(nextDoubleGen)
-    assert(paths.count() == graph.vertices.count()) // a path per vertex
-    paths.collect().foreach { (p: Array[Long]) =>
-      val p2 = doSecondOrderRandomWalk(graph, p(0), wLength, rSampler)
+    nSampler = naive.RandomSample(nextDoubleGen)
+    assert(paths.count() == rw.gMap.value.numVertices) // a path per vertex
+    baseRw = naive.RandomWalk(sc, config).loadGraph()
+    paths.collect().foreach { case (t: Long, p: Array[Long]) =>
+      val p2 = doSecondOrderRandomWalk(baseRw, p(0), wLength, nSampler)
       assert(p sameElements p2)
     }
   }
 
   private def doSecondOrderRandomWalk(graph: Graph[Array[Long], Double], src: Long,
-                                      walkLength: Int, rSampler: RandomSample): Array[Long] = {
+                                      walkLength: Int, rSampler: naive.RandomSample): Array[Long]
+  = {
     val v2N = graph.collectEdges(EdgeDirection.Out)
     var path = Array(src)
     val neighbors = v2N.lookup(src)

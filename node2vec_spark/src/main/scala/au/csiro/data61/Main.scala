@@ -136,7 +136,7 @@ object Main {
         //          Node2vec.save(randomPaths)
         //          Word2vec.readFromRdd(randomPaths).fit().save()
         case Command.s_randomwalk =>
-          val rw = RandomWalk(context, param)
+          val rw = RandomWalk2(context, param)
           val graph = rw.loadGraph()
           val paths = rw.randomWalk(graph)
           rw.save(paths)

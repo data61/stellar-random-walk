@@ -7,7 +7,7 @@ import org.apache.spark.graphx.{Edge, VertexId}
 /**
   *
   */
-object GraphMap extends Serializable {
+case class GraphMap() extends Serializable {
 
   private var srcVertexMap: ConcurrentMap[Long, Int] = _
   private var lengths: Array[Int] = _

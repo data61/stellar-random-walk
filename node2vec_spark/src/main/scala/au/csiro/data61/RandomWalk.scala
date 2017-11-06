@@ -29,7 +29,7 @@ case class RandomWalk(context: SparkContext,
     val edges: RDD[Edge[Double]] = context.textFile(config.input).flatMap { triplet =>
       val parts = triplet.split("\\s+")
       // if the weights are not specified it sets it to 1.0
-      val weight = bcWeighted.value match {
+      val weight = bcWeighted.value && parts.length > 2 match {
         case true => Try(parts.last.toDouble).getOrElse(1.0)
         case false => 1.0
       }
@@ -63,7 +63,7 @@ case class RandomWalk(context: SparkContext,
         (currNeighbors: Option[Array[Edge[Double]]], path: Array[Long])) =>
           currNeighbors match {
             case Some(edges) =>
-               RandomSample(nextDouble).sample(edges) match {
+              RandomSample(nextDouble).sample(edges) match {
                 case Some(newStep) => (newStep.dstId, ((currId, Some(edges)), path
                   ++ Array(currId, newStep.dstId)))
                 //            case None => (currId, ((currId, edges), path ++ Array(currId))) //

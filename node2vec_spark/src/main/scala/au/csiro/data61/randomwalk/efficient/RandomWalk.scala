@@ -93,48 +93,58 @@ case class RandomWalk(context: SparkContext,
 
   def randomWalk(initPaths: RDD[(Long, Array[Long])], nextDouble: () => Double = Random
     .nextDouble)
-  : RDD[(Long, Array[Long])] = {
+  : RDD[Array[Long]] = {
     val bcP = context.broadcast(config.p)
     val bcQ = context.broadcast(config.q)
     val walkLength = context.broadcast(config.walkLength).value
+    val numberOfWalks = context.broadcast(config.numWalks).value
     // initialize the first step of the random walk
-
-    val paths = doFirsStepOfRandomWalk(initPaths, nextDouble).cache()
+    var totalPaths: RDD[Array[Long]] = null
     val map = gMap.value
-    paths.first()
-    paths.mapPartitions { iter =>
-      iter.map { case (src: Long, firstStep: Array[Long]) =>
-        var path = firstStep
-        if (firstStep.length > 1)
-          breakable {
-            for (_ <- 0 until walkLength) {
-              val curr = path.last
-              val currNeighbors = map.getNeighbors(curr)
-              if (currNeighbors.length > 0) {
-                val prev = path(path.length - 2)
-                val prevNeighbors = map.getNeighbors(prev)
-                val (nextStep, _) = RandomSample(nextDouble).secondOrderSample(bcP.value, bcQ
-                  .value, prev, prevNeighbors, currNeighbors)
-                path = path ++ Array(nextStep)
-              } else {
-                break
+    val paths = doFirsStepOfRandomWalk(initPaths, nextDouble)
+    for (_ <- 0 until numberOfWalks) {
+      val newPaths = paths.mapPartitions { iter =>
+        iter.map { case (_, firstStep: Array[Long]) =>
+          var path = firstStep
+          val rSample = RandomSample(nextDouble)
+          if (firstStep.length > 1)
+            breakable {
+              for (_ <- 0 until walkLength) {
+                val curr = path.last
+                val currNeighbors = map.getNeighbors(curr)
+                if (currNeighbors.length > 0) {
+                  val prev = path(path.length - 2)
+                  val prevNeighbors = map.getNeighbors(prev)
+                  val (nextStep, _) = rSample.secondOrderSample(bcP.value, bcQ
+                    .value, prev, prevNeighbors, currNeighbors)
+                  path = path ++ Array(nextStep)
+                } else {
+                  break
+                }
               }
             }
-          }
-        (src, path)
-      }
-    }.cache()
+          path
+        }
+      }.cache()
+
+      if (totalPaths != null)
+        totalPaths = totalPaths.union(newPaths).cache()
+      else
+        totalPaths = newPaths
+    }
+
+    totalPaths
   }
 
-  def save(paths: RDD[(Long, Array[Long])]) = {
+  def save(paths: RDD[Array[Long]]) = {
 
     paths.mapPartitions { iter =>
       iter.map {
-        case ((src, path)) =>
+        case (path) =>
           val pathString = path.mkString("\t")
           s"$pathString"
       }
-    }.saveAsTextFile(s"${
+    }.repartition(config.rddPartitions).saveAsTextFile(s"${
       config.output
     }" +
       s".${

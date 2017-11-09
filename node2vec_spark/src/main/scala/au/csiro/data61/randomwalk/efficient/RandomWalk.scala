@@ -15,7 +15,8 @@ case class RandomWalk(context: SparkContext,
                       config: Main.Params) extends Serializable {
 
   lazy val logger = LogManager.getLogger("myLogger")
-  val gMap = context.broadcast(GraphMap())
+  var nVertices: Long = 0
+  var nEdges: Long = 0
 
   /**
     * Loads the graph and computes the probabilities to go from each vertex to its neighbors
@@ -27,6 +28,9 @@ case class RandomWalk(context: SparkContext,
     // is directed? they will be shared among stages and executors
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
+    val vAccum = context.longAccumulator("vertices")
+    val eAccum = context.longAccumulator("edges")
+
     // inputTriplets is an array of edges (src, dst, weight).
 
     val edges: RDD[Edge[Double]] = context.textFile(config.input).flatMap { triplet =>
@@ -52,39 +56,63 @@ case class RandomWalk(context: SparkContext,
       partitionBy(partitionStrategy = PartitionStrategy.EdgePartition2D, numPartitions = config
         .rddPartitions).cache()
 
-    val g = graph.collectEdges(EdgeDirection.Out).rightOuterJoin(graph.vertices).map { case
-      (vId: Long, (neighbors: Option[Array[Edge[Double]]], _)) =>
-      neighbors match {
-        case Some(edges) => (vId, edges)
-        case None => (vId, Array.empty[Edge[Double]])
-      }
+    val g = graph.collectEdges(EdgeDirection.Out)
+    val deadEnds = graph.collectNeighborIds(EdgeDirection.Out).filter(_._2.isEmpty).map { case
+      (id, _) =>
+      id
     }
+    val numEdges = context.broadcast(graph.edges.count().toInt)
+    val numDeadEnds = context.broadcast(deadEnds.count().toInt)
+    val numVertices = context.broadcast(g.count().toInt + numDeadEnds.value)
 
-    gMap.value.setUp(g.collect(), graph.edges.count.toInt)
+    g.mapPartitions { iter =>
+      GraphMap.setUp(numVertices.value, numDeadEnds.value, numEdges.value)
+      val newIter = iter.map {
+        case (vId: Long, (neighbors: Array[Edge[Double]])) =>
+          GraphMap.addVertex(vId, neighbors)
+          vAccum.add(1)
+          eAccum.add(neighbors.length)
+          vId
+      }
+      newIter
+    }.count()
 
-    logger.info(s"edges: ${gMap.value.numEdges}")
-    logger.info(s"vertices: ${gMap.value.numVertices}")
+    deadEnds.mapPartitions { iter =>
+      val newIter = iter.map {
+        case vId =>
+          GraphMap.addVertex(vId)
+          vAccum.add(1)
+          vId
+      }
+
+      newIter
+    }.count()
+
+
+    nVertices = vAccum.sum
+    nEdges = eAccum.sum
+
+    logger.info(s"edges: $nEdges")
+    logger.info(s"vertices: $nVertices")
 
     val initPaths = graph.vertices.map { case (vId: Long, _) =>
       (vId, Array(vId))
     }
-
-    graph.unpersist(blocking = false)
-    edges.unpersist(blocking = false)
 
     initPaths.partitionBy(new HashPartitioner(config.rddPartitions)).cache()
   }
 
   def doFirsStepOfRandomWalk(paths: RDD[(Long, Array[Long])], nextDouble: () =>
     Double = Random.nextDouble): RDD[(Long, Array[Long])] = {
-    val map = gMap.value
+    //    val map = gMap.value
     paths.mapPartitions { iter =>
       iter.map { case ((src: Long, path: Array[Long])) =>
-        val neighbors = map.getNeighbors(path.head)
-        if (neighbors.length > 0) {
+        val neighbors = GraphMap.getNeighbors(path.head)
+        if (neighbors != null && neighbors.length > 0) {
           val (nextStep, _) = RandomSample(nextDouble).sample(neighbors)
           (src, path ++ Array(nextStep))
         } else {
+          // TODO maybe the neighbors are not in this partition.
           (src, path)
         }
       }
@@ -100,7 +128,6 @@ case class RandomWalk(context: SparkContext,
     val numberOfWalks = context.broadcast(config.numWalks).value
     // initialize the first step of the random walk
     var totalPaths: RDD[Array[Long]] = null
-    val map = gMap.value
     val paths = doFirsStepOfRandomWalk(initPaths, nextDouble)
     for (_ <- 0 until numberOfWalks) {
       val newPaths = paths.mapPartitions { iter =>
@@ -111,14 +138,16 @@ case class RandomWalk(context: SparkContext,
             breakable {
               for (_ <- 0 until walkLength) {
                 val curr = path.last
-                val currNeighbors = map.getNeighbors(curr)
-                if (currNeighbors.length > 0) {
+                val currNeighbors = GraphMap.getNeighbors(curr)
+                if (currNeighbors != null && currNeighbors.length > 0) {
                   val prev = path(path.length - 2)
-                  val prevNeighbors = map.getNeighbors(prev)
+                  val prevNeighbors = GraphMap.getNeighbors(prev)
+                  // TODO handle sending prevNeighbors to the destination partition
                   val (nextStep, _) = rSample.secondOrderSample(bcP.value, bcQ
                     .value, prev, prevNeighbors, currNeighbors)
                   path = path ++ Array(nextStep)
                 } else {
+                  // TODO maybe the neighbors are not in this partition
                   break
                 }
               }
@@ -128,7 +157,7 @@ case class RandomWalk(context: SparkContext,
       }.cache()
 
       if (totalPaths != null)
-        totalPaths = totalPaths.union(newPaths).cache()
+        totalPaths = totalPaths.union(newPaths).persist(StorageLevel.MEMORY_AND_DISK)
       else
         totalPaths = newPaths
     }

@@ -21,26 +21,43 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     if (sc != null) {
       sc.stop()
     }
-  }
-
-  test("load graph as directed") {
-    val config = Params(input = "./src/test/graph/karate.txt", directed = true)
-    val rw = RandomWalk(sc, config)
-    val paths = rw.loadGraph()
-    val graph = rw.gMap
-    assert(graph.value.numEdges == 78)
-    assert(graph.value.numVertices == 34)
-    assert(paths.count() == 34)
+    GraphMap.reset
   }
 
   test("load graph as undirected") {
     val config = Params(input = "./src/test/graph/karate.txt", directed = false)
     val rw = RandomWalk(sc, config)
     val paths = rw.loadGraph() // loadGraph(int)
-    val graph = rw.gMap.value
-    assert(graph.numEdges == 156)
-    assert(graph.numVertices == 34)
+    assert(rw.nEdges == 156)
+    assert(rw.nVertices == 34)
     assert(paths.count() == 34)
+    val vAcc = sc.longAccumulator("v")
+    val eAcc = sc.longAccumulator("e")
+    paths.coalesce(1).mapPartitions { iter =>
+      vAcc.add(GraphMap.getNumVertices)
+      eAcc.add(GraphMap.getNumEdges)
+      iter
+    }.first()
+    assert(eAcc.sum == 156)
+    assert(vAcc.sum == 34)
+  }
+
+  test("load graph as directed") {
+    val config = Params(input = "./src/test/graph/karate.txt", directed = true)
+    val rw = RandomWalk(sc, config)
+    val paths = rw.loadGraph()
+    assert(rw.nEdges == 78)
+    assert(rw.nVertices == 34)
+    assert(paths.count() == 34)
+    val vAcc = sc.longAccumulator("v")
+    val eAcc = sc.longAccumulator("e")
+    paths.coalesce(1).mapPartitions { iter =>
+      vAcc.add(GraphMap.getNumVertices)
+      eAcc.add(GraphMap.getNumEdges)
+      iter
+    }.first()
+    assert(eAcc.sum == 78)
+    assert(vAcc.sum == 34)
   }
 
   test("the first step of Random Walk") {
@@ -62,74 +79,118 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     }
   }
 
-  test("test 2nd order random walk") {
+  test("test 2nd order random walk undirected1") {
     // Undirected graph
-    var rValue = 0.1
-    var wLength = 1
-    var nextDoubleGen = () => rValue
-    var config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
+    val rValue = 0.1
+    val wLength = 1
+    val nextDoubleGen = () => rValue
+    val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
-    var rw = RandomWalk(sc, config)
-    var graph = rw.loadGraph()
-    var paths = rw.randomWalk(graph, nextDoubleGen)
-    var rSampler = RandomSample(nextDoubleGen)
-    var nSampler = naive.RandomSample(nextDoubleGen)
-    assert(paths.count() == rw.gMap.value.numVertices) // a path per vertex
-    var baseRw = naive.RandomWalk(sc, config).loadGraph()
+    val rw = RandomWalk(sc, config)
+    val graph = rw.loadGraph()
+    val paths = rw.randomWalk(graph, nextDoubleGen)
+    val nSampler = naive.RandomSample(nextDoubleGen)
+    assert(paths.count() == rw.nVertices) // a path per vertex
+    val baseRw = naive.RandomWalk(sc, config).loadGraph()
     paths.collect().foreach { case (p: Array[Long]) =>
       val p2 = doSecondOrderRandomWalk(baseRw, p(0), wLength, nSampler)
       assert(p sameElements p2)
     }
+  }
 
-    wLength = 50
-    config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
+  test("test 2nd order random walk undirected2") {
+    // Undirected graph
+    val rValue = 0.1
+    val nextDoubleGen = () => rValue
+    val nSampler = naive.RandomSample(nextDoubleGen)
+    val wLength = 50
+    val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
-    rw = RandomWalk(sc, config)
-    graph = rw.loadGraph()
-    paths = rw.randomWalk(graph, nextDoubleGen)
-    rSampler = RandomSample(nextDoubleGen)
-    assert(paths.count() == rw.gMap.value.numVertices) // a path per vertex
-    baseRw = naive.RandomWalk(sc, config).loadGraph()
+    val rw = RandomWalk(sc, config)
+    val graph = rw.loadGraph()
+    val paths = rw.randomWalk(graph, nextDoubleGen)
+    assert(paths.count() == rw.nVertices) // a path per vertex
+    val baseRw = naive.RandomWalk(sc, config).loadGraph()
     paths.collect().foreach { case (p: Array[Long]) =>
       val p2 = doSecondOrderRandomWalk(baseRw, p(0), wLength, nSampler)
       assert(p sameElements p2)
     }
+  }
 
-    rValue = 0.9
-    nextDoubleGen = () => rValue
-    rw = RandomWalk(sc, config)
-    graph = rw.loadGraph()
-    paths = rw.randomWalk(graph, nextDoubleGen)
-    rSampler = RandomSample(nextDoubleGen)
-    assert(paths.count() == rw.gMap.value.numVertices) // a path per vertex
-    baseRw = naive.RandomWalk(sc, config).loadGraph()
+  test("test 2nd order random walk undirected3") {
+    // Undirected graph
+    val wLength = 50
+    val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
+      wLength, rddPartitions = 8, numWalks = 1)
+    val rValue = 0.9
+    val nextDoubleGen = () => rValue
+    val rw = RandomWalk(sc, config)
+    val graph = rw.loadGraph()
+    val paths = rw.randomWalk(graph, nextDoubleGen)
+    assert(paths.count() == rw.nVertices) // a path per vertex
+    val baseRw = naive.RandomWalk(sc, config).loadGraph()
+    val nSampler = naive.RandomSample(nextDoubleGen)
     paths.collect().foreach { case (p: Array[Long]) =>
       val p2 = doSecondOrderRandomWalk(baseRw, p(0), wLength, nSampler)
       assert(p sameElements p2)
     }
+  }
+
+  test("test 2nd order random walk undirected4") {
+    // Undirected graph
+    val rValue = 0.1
+    val nextDoubleGen = () => rValue
+    val nSampler = naive.RandomSample(nextDoubleGen)
+    val wLength = 50
+    val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
+      wLength, rddPartitions = 8, numWalks = 1)
+    val rw = RandomWalk(sc, config)
+    val graph = rw.loadGraph()
+    val paths = rw.randomWalk(graph, nextDoubleGen)
+    assert(paths.count() == rw.nVertices) // a path per vertex
+    val baseRw = naive.RandomWalk(sc, config).loadGraph()
+    paths.collect().foreach { case (p: Array[Long]) =>
+      val p2 = doSecondOrderRandomWalk(baseRw, p(0), wLength, nSampler)
+      assert(p sameElements p2)
+    }
+  }
+
+  test("test 2nd order random walk directed1") {
+    val wLength = 50
+    val rValue = 0.9
+    val nextDoubleGen = () => rValue
 
     // Directed Graph
-    config = Params(input = "./src/test/graph/karate.txt", directed = true, walkLength =
+    val config = Params(input = "./src/test/graph/karate.txt", directed = true, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
-    rw = RandomWalk(sc, config)
-    graph = rw.loadGraph()
-    paths = rw.randomWalk(graph, nextDoubleGen)
-    rSampler = RandomSample(nextDoubleGen)
-    assert(paths.count() == rw.gMap.value.numVertices) // a path per vertex
-    baseRw = naive.RandomWalk(sc, config).loadGraph()
+    val rw = RandomWalk(sc, config)
+    val graph = rw.loadGraph()
+    val paths = rw.randomWalk(graph, nextDoubleGen)
+    val rSampler = RandomSample(nextDoubleGen)
+    val nSampler = naive.RandomSample(nextDoubleGen)
+    assert(paths.count() == rw.nVertices) // a path per vertex
+    val baseRw = naive.RandomWalk(sc, config).loadGraph()
     paths.collect().foreach { case (p: Array[Long]) =>
       val p2 = doSecondOrderRandomWalk(baseRw, p(0), wLength, nSampler)
       assert(p sameElements p2)
     }
+  }
 
-    rValue = 0.1
-    nextDoubleGen = () => rValue
-    graph = rw.loadGraph()
-    paths = rw.randomWalk(graph, nextDoubleGen)
-    rSampler = RandomSample(nextDoubleGen)
-    nSampler = naive.RandomSample(nextDoubleGen)
-    assert(paths.count() == rw.gMap.value.numVertices) // a path per vertex
-    baseRw = naive.RandomWalk(sc, config).loadGraph()
+  test("test 2nd order random walk directed2") {
+    // Undirected graph
+    val wLength = 50
+
+    // Directed Graph
+    val config = Params(input = "./src/test/graph/karate.txt", directed = true, walkLength =
+      wLength, rddPartitions = 8, numWalks = 1)
+    val rw = RandomWalk(sc, config)
+    val rValue = 0.1
+    val nextDoubleGen = () => rValue
+    val graph = rw.loadGraph()
+    val paths = rw.randomWalk(graph, nextDoubleGen)
+    val nSampler = naive.RandomSample(nextDoubleGen)
+    assert(paths.count() == rw.nVertices) // a path per vertex
+    val baseRw = naive.RandomWalk(sc, config).loadGraph()
     paths.collect().foreach { case (p: Array[Long]) =>
       val p2 = doSecondOrderRandomWalk(baseRw, p(0), wLength, nSampler)
       assert(p sameElements p2)

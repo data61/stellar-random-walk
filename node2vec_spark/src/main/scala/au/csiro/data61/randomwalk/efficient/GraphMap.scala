@@ -1,70 +1,90 @@
 package au.csiro.data61.randomwalk.efficient
 
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
 
 import org.apache.spark.graphx.Edge
+
+import scala.collection.mutable
+import scala.collection.mutable.HashMap
+
 
 /**
   *
   */
-case class GraphMap() extends Serializable {
 
-  private var srcVertexMap: ConcurrentMap[Long, Int] = _
-  private var lengths: Array[Int] = _
-  private var offsets: Array[Int] = _
-  private var edges: Array[(Long, Double)] = _
+object GraphMap {
+
+  private var numVertices: Int = 0
+  private var numDeadEnds: Int = 0
+  private var numEdges: Int = 0
+
+  private lazy val srcVertexMap: mutable.Map[Long, Int] = new HashMap[Long, Int]()
+  private lazy val offsets: Array[Int] = new Array(numVertices - numDeadEnds)
+  private lazy val lengths: Array[Int] = new Array(numVertices - numDeadEnds)
+  private lazy val edges: Array[(Long, Double)] = new Array(numEdges)
+  private var indexCounter: Int = 0
+  private var offsetCounter: Int = 0
 
   /**
+    * It only affects before calling addVertex for the first time. The size cannot grow after that.
     *
-    *
-    * @param verticesToNeighbors
+    * @param numVertices
+    * @param numDeadEnds
     * @param numEdges
     */
-  def setUp(verticesToNeighbors: Array[(Long, Array[Edge[Double]])], numEdges: Int) {
-    // Not having a vId in the map can mean either: (i) the vertex has no outbound edge
-    val numVertices = verticesToNeighbors.length
-    srcVertexMap = new ConcurrentHashMap(numVertices)
-    offsets = new Array(numVertices)
-    lengths = new Array(numVertices)
-    edges = new Array(numEdges)
+  def setUp(numVertices: Int, numDeadEnds: Int, numEdges: Int) = {
+    this.numVertices = numVertices
+    this.numDeadEnds = numDeadEnds
+    this.numEdges = numEdges
 
-    var eCounter: Int = 0
-    for (index <- 0 until numVertices) {
-      val (vId: Long, neighbors: Array[Edge[Double]]) = verticesToNeighbors(index)
-      srcVertexMap.put(vId, index)
-      offsets(index) = eCounter
-      lengths(index) = neighbors.length
-      for (e <- 0 until neighbors.length) {
-        edges(eCounter) = (neighbors(e).dstId, neighbors(e).attr)
-        eCounter += 1
-      }
+  }
+
+  def addVertex(vId: Long, neighbors: Array[Edge[Double]]) = synchronized {
+    srcVertexMap.put(vId, indexCounter)
+    offsets(indexCounter) = offsetCounter
+    lengths(indexCounter) = neighbors.length
+    for (e <- 0 until neighbors.length) {
+      edges(offsetCounter) = (neighbors(e).dstId, neighbors(e).attr)
+      offsetCounter += 1
     }
+
+    indexCounter += 1
   }
 
-  def numVertices: Int = {
-    offsets.length
+  def addVertex(vId: Long) {
+    srcVertexMap.put(vId, -1)
   }
 
-  def numEdges: Int = {
-    edges.length
+  def getNumVertices: Int = {
+    srcVertexMap.size
+  }
+
+  def getNumEdges: Int = {
+    offsetCounter
   }
 
   /**
-    *
-    * @param vid
-    * @return (offset, length)
+    * The reset is mainly for the unit test purpose. It does not reset the size of data
+    * structures that are initialy set by calling setUp function.
     */
-  //  def getNeighborsIndices(vid: Long): (Int, Int) = {
-  //    val index = srcVertexMap.get(vid)
-  //    val offset = offsets(index)
-  //    val length = lengths(index)
-  //    (offset, length)
-  //  }
+  def reset {
+    numVertices = 0
+    numEdges = 0
+    numDeadEnds = 0
+    indexCounter = 0
+    offsetCounter = 0
+    srcVertexMap.clear()
+  }
 
   def getNeighbors(vid: Long): Array[(Long, Double)] = {
-    val index = srcVertexMap.get(vid)
-    val offset = offsets(index)
-    val length = lengths(index)
-    edges.slice(offset, offset + length)
+    srcVertexMap.get(vid) match {
+      case Some(index) =>
+        if (index == -1) {
+          return Array.empty[(Long, Double)]
+        }
+        val offset = offsets(index)
+        val length = lengths(index)
+        edges.slice(offset, offset + length)
+      case None => null
+    }
   }
 }

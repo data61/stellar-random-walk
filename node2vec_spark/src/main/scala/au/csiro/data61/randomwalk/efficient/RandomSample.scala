@@ -1,7 +1,5 @@
 package au.csiro.data61.randomwalk.efficient
 
-import org.apache.spark.graphx.Edge
-
 import scala.util.Random
 
 case class RandomSample(nextDouble: () => Double = Random.nextDouble) extends Serializable {
@@ -61,13 +59,5 @@ case class RandomSample(nextDouble: () => Double = Random.nextDouble) extends Se
                                currNeighbors: Array[(Long, Double)]): (Long, Double) = {
     val newCurrentNeighbors = computeSecondOrderWeights(p, q, prevId, prevNeighbors, currNeighbors)
     sample(newCurrentNeighbors)
-  }
-
-  private final def resolveEdgeIndex(edges: Array[Edge[Double]], index: Int)
-  : Option[Edge[Double]] = {
-    index match {
-      case -1 => None
-      case _ => Some(edges(index))
-    }
   }
 }

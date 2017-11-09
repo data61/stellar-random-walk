@@ -33,7 +33,8 @@ case class RandomWalk(context: SparkContext,
 
     // inputTriplets is an array of edges (src, dst, weight).
 
-    val edges: RDD[Edge[Double]] = context.textFile(config.input).flatMap { triplet =>
+    val edges: RDD[Edge[Double]] = context.textFile(config.input, minPartitions = config
+      .rddPartitions).flatMap { triplet =>
       val parts = triplet.split("\\s+")
       // if the weights are not specified it sets it to 1.0
 
@@ -52,9 +53,9 @@ case class RandomWalk(context: SparkContext,
 
     val graph: Graph[_, Double] = Graph.fromEdges(edges, defaultValue = None,
       edgeStorageLevel =
-        StorageLevel.MEMORY_ONLY, vertexStorageLevel = StorageLevel.MEMORY_ONLY).
+        StorageLevel.MEMORY_AND_DISK, vertexStorageLevel = StorageLevel.MEMORY_AND_DISK).
       partitionBy(partitionStrategy = PartitionStrategy.EdgePartition2D, numPartitions = config
-        .rddPartitions).cache()
+        .rddPartitions)
 
     val g = graph.collectEdges(EdgeDirection.Out)
     val deadEnds = graph.collectNeighborIds(EdgeDirection.Out).filter(_._2.isEmpty).map { case
@@ -62,6 +63,7 @@ case class RandomWalk(context: SparkContext,
       id
     }
     val numEdges = context.broadcast(graph.edges.count().toInt)
+    graph.edges.unpersist(blocking = false)
     val numDeadEnds = context.broadcast(deadEnds.count().toInt)
     val numVertices = context.broadcast(g.count().toInt + numDeadEnds.value)
 
@@ -77,6 +79,8 @@ case class RandomWalk(context: SparkContext,
       newIter
     }.count()
 
+    g.unpersist(blocking = false)
+
     deadEnds.mapPartitions { iter =>
       val newIter = iter.map {
         case vId =>
@@ -88,6 +92,7 @@ case class RandomWalk(context: SparkContext,
       newIter
     }.count()
 
+    deadEnds.unpersist(blocking = false)
 
     nVertices = vAccum.sum
     nEdges = eAccum.sum
@@ -95,11 +100,9 @@ case class RandomWalk(context: SparkContext,
     logger.info(s"edges: $nEdges")
     logger.info(s"vertices: $nVertices")
 
-    val initPaths = graph.vertices.map { case (vId: Long, _) =>
+    graph.vertices.map { case (vId: Long, _) =>
       (vId, Array(vId))
-    }
-
-    initPaths.partitionBy(new HashPartitioner(config.rddPartitions)).cache()
+    }.partitionBy(new HashPartitioner(config.rddPartitions)).cache()
   }
 
   def doFirsStepOfRandomWalk(paths: RDD[(Long, Array[Long])], nextDouble: () =>

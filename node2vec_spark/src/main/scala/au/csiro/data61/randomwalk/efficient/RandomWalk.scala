@@ -3,7 +3,6 @@ package au.csiro.data61.randomwalk.efficient
 import au.csiro.data61.Main
 import com.navercorp.common.Property
 import org.apache.log4j.LogManager
-import org.apache.spark.graphx._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{HashPartitioner, SparkContext}
@@ -31,9 +30,8 @@ case class RandomWalk(context: SparkContext,
     val vAccum = context.longAccumulator("vertices")
     val eAccum = context.longAccumulator("edges")
 
-    // inputTriplets is an array of edges (src, dst, weight).
-
-    val edges: RDD[Edge[Double]] = context.textFile(config.input, minPartitions = config
+    val g: RDD[(Long, Array[(Long, Double)])] = context.textFile(config.input, minPartitions
+      = config
       .rddPartitions).flatMap { triplet =>
       val parts = triplet.split("\\s+")
       // if the weights are not specified it sets it to 1.0
@@ -45,32 +43,27 @@ case class RandomWalk(context: SparkContext,
 
       val (src, dst) = (parts.head.toLong, parts(1).toLong)
       if (bcDirected.value) {
-        Array(Edge(src, dst, weight))
+        eAccum.add(1)
+        Array((src, Array((dst, weight))), (dst, Array.empty[(Long, Double)]))
       } else {
-        Array(Edge(src, dst, weight), Edge(dst, src, weight))
+        eAccum.add(2)
+        Array((src, Array((dst, weight))), (dst, Array((src, weight))))
       }
-    }.cache()
+    }.
+      reduceByKey(_ ++ _).
+      partitionBy(new HashPartitioner(config.rddPartitions)).
+      persist(StorageLevel.MEMORY_AND_DISK)
 
-    val graph: Graph[_, Double] = Graph.fromEdges(edges, defaultValue = None,
-      edgeStorageLevel =
-        StorageLevel.MEMORY_AND_DISK, vertexStorageLevel = StorageLevel.MEMORY_AND_DISK).
-      partitionBy(partitionStrategy = PartitionStrategy.EdgePartition2D, numPartitions = config
-        .rddPartitions)
+    val numDeadEnds = context.broadcast(g.filter(_._2.isEmpty).count().toInt)
+    val numEdges = context.broadcast(eAccum.sum.toInt)
+    eAccum.reset()
 
-    val g = graph.collectEdges(EdgeDirection.Out)
-    val deadEnds = graph.collectNeighborIds(EdgeDirection.Out).filter(_._2.isEmpty).map { case
-      (id, _) =>
-      id
-    }
-    val numEdges = context.broadcast(graph.edges.count().toInt)
-    graph.edges.unpersist(blocking = false)
-    val numDeadEnds = context.broadcast(deadEnds.count().toInt)
-    val numVertices = context.broadcast(g.count().toInt + numDeadEnds.value)
+    val numVertices = context.broadcast(g.count().toInt)
 
     g.mapPartitions { iter =>
       GraphMap.setUp(numVertices.value, numDeadEnds.value, numEdges.value)
       val newIter = iter.map {
-        case (vId: Long, (neighbors: Array[Edge[Double]])) =>
+        case (vId: Long, (neighbors: Array[(Long, Double)])) =>
           GraphMap.addVertex(vId, neighbors)
           vAccum.add(1)
           eAccum.add(neighbors.length)
@@ -79,29 +72,18 @@ case class RandomWalk(context: SparkContext,
       newIter
     }.count()
 
-    g.unpersist(blocking = false)
-
-    deadEnds.mapPartitions { iter =>
-      val newIter = iter.map {
-        case vId =>
-          GraphMap.addVertex(vId)
-          vAccum.add(1)
-          vId
-      }
-
-      newIter
-    }.count()
-
-    deadEnds.unpersist(blocking = false)
-
     nVertices = vAccum.sum
     nEdges = eAccum.sum
 
     logger.info(s"edges: $nEdges")
     logger.info(s"vertices: $nVertices")
 
-    graph.vertices.map { case (vId: Long, _) =>
-      (vId, Array(vId))
+    g.mapPartitions { iter =>
+      iter.map {
+        case (vId: Long, _) =>
+
+          (vId, Array(vId))
+      }
     }.partitionBy(new HashPartitioner(config.rddPartitions)).cache()
   }
 

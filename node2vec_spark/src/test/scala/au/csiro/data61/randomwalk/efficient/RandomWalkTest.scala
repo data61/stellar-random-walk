@@ -66,7 +66,7 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val result = rw.doFirsStepOfRandomWalk(paths)
     assert(result.count == paths.count())
     for (t <- result.collect()) {
-      val p = t._2
+      val p = t._2._1
       if (p.length == 2) {
         assert(p.head == 1)
         assert(p sameElements Array(1L, 2L))
@@ -137,7 +137,6 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     // Undirected graph
     val rValue = 0.1
     val nextDoubleGen = () => rValue
-    val nSampler = naive.RandomSample(nextDoubleGen)
     val wLength = 50
     val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)

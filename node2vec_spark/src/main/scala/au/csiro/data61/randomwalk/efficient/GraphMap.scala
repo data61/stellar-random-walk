@@ -50,16 +50,20 @@ object GraphMap {
     indexCounter += 1
   }
 
-  def addVertex(vId: Long, neighbors: Array[(Long, Double)]) = synchronized {
-    srcVertexMap.put(vId, indexCounter)
-    offsets(indexCounter) = offsetCounter
-    lengths(indexCounter) = neighbors.length
-    for (e <- neighbors) {
-      edges(offsetCounter) = e
-      offsetCounter += 1
-    }
+  def addVertex(vId: Long, neighbors: Array[(Long, Double)]): Unit = synchronized {
+    if (!neighbors.isEmpty) {
+      srcVertexMap.put(vId, indexCounter)
+      offsets(indexCounter) = offsetCounter
+      lengths(indexCounter) = neighbors.length
+      for (e <- neighbors) {
+        edges(offsetCounter) = e
+        offsetCounter += 1
+      }
 
-    indexCounter += 1
+      indexCounter += 1
+    } else {
+      this.addVertex(vId)
+    }
   }
 
   def addVertex(vId: Long) {

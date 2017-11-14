@@ -89,7 +89,7 @@ case class RandomWalk(context: SparkContext,
   }
 
   def doFirsStepOfRandomWalk(paths: RDD[(Long, Array[Long])], nextDouble: () =>
-    Double = Random.nextDouble): RDD[(Long, (Array[Long], Array[Long], Long, Int))] = {
+    Double = Random.nextDouble): RDD[(Long, (Array[Long], Array[(Long, Double)], Long, Int))] = {
     val walkLength = context.broadcast(config.walkLength)
     paths.mapPartitions { iter =>
       val stepCounter = 0
@@ -97,10 +97,10 @@ case class RandomWalk(context: SparkContext,
         val neighbors = GraphMap.getNeighbors(path.head)
         if (neighbors != null && neighbors.length > 0) {
           val (nextStep, _) = RandomSample(nextDouble).sample(neighbors)
-          (src, (path ++ Array(nextStep), Array.empty[Long], src, stepCounter))
+          (src, (path ++ Array(nextStep), GraphMap.getNeighbors(src), src, stepCounter))
         } else {
           // It's a deadend.
-          (src, (path, Array.empty[Long], src, walkLength.value))
+          (src, (path, Array.empty[(Long, Double)], src, walkLength.value))
         }
       }
     }
@@ -118,27 +118,30 @@ case class RandomWalk(context: SparkContext,
     var totalPaths: RDD[Array[Long]] = context.emptyRDD[Array[Long]]
     for (_ <- 0 until numberOfWalks.value) {
       var pathsPieces: RDD[(Long, (Array[Long], Int))] = context.emptyRDD
-      var newPaths: RDD[(Long, (Array[Long], Array[Long], Long, Int))] =
+      var newPaths: RDD[(Long, (Array[Long], Array[(Long, Double)], Long, Int))] =
         doFirsStepOfRandomWalk(initPaths, nextDouble)
       while (!newPaths.isEmpty()) {
         newPaths = newPaths.mapPartitions { iter =>
-          iter.map { case (src: Long, (steps: Array[Long], prevNeighbors: Array[Long],
+          iter.map { case (src: Long, (steps: Array[Long], prevNeighbors: Array[(Long, Double)],
           origin: Long, numSteps: Int)) =>
             var path = steps
             var stepCounter = numSteps
             val rSample = RandomSample(nextDouble)
+            var pNeighbors = prevNeighbors
             if (steps.length > 1) {
               breakable {
                 while (stepCounter < walkLength.value) {
                   val curr = path.last
                   val currNeighbors = GraphMap.getNeighbors(curr)
                   val prev = path(path.length - 2)
-                  val prevNeighbors = GraphMap.getNeighbors(prev)
+                  if (path.length > 2) { // If the walker is continuing on the local partition.
+                    pNeighbors = GraphMap.getNeighbors(prev)
+                  }
                   if (currNeighbors != null) {
                     if (currNeighbors.length > 0) {
                       stepCounter += 1
                       val (nextStep, _) = rSample.secondOrderSample(bcP.value, bcQ
-                        .value, prev, prevNeighbors, currNeighbors)
+                        .value, prev, pNeighbors, currNeighbors)
                       path = path ++ Array(nextStep)
                     } else {
                       stepCounter = walkLength.value
@@ -154,7 +157,7 @@ case class RandomWalk(context: SparkContext,
               }
             }
 
-            (src, (path, prevNeighbors, origin, stepCounter))
+            (src, (path, pNeighbors, origin, stepCounter))
           }
         }.cache()
 

@@ -4,7 +4,7 @@ package au.csiro.data61.randomwalk.efficient
 import org.apache.spark.graphx.Edge
 
 import scala.collection.mutable
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 
 /**
@@ -13,37 +13,19 @@ import scala.collection.mutable.HashMap
 
 object GraphMap {
 
-  private var numVertices: Int = 0
-  private var numDeadEnds: Int = 0
-  private var numEdges: Int = 0
-
   private lazy val srcVertexMap: mutable.Map[Long, Int] = new HashMap[Long, Int]()
-  private lazy val offsets: Array[Int] = new Array(numVertices - numDeadEnds)
-  private lazy val lengths: Array[Int] = new Array(numVertices - numDeadEnds)
-  private lazy val edges: Array[(Long, Double)] = new Array(numEdges)
+  private lazy val offsets: ArrayBuffer[Int] = new ArrayBuffer()
+  private lazy val lengths: ArrayBuffer[Int] = new ArrayBuffer()
+  private lazy val edges: ArrayBuffer[(Long, Double)] = new ArrayBuffer()
   private var indexCounter: Int = 0
   private var offsetCounter: Int = 0
 
-  /**
-    * It only affects before calling addVertex for the first time. The size cannot grow after that.
-    *
-    * @param numVertices
-    * @param numDeadEnds
-    * @param numEdges
-    */
-  def setUp(numVertices: Int, numDeadEnds: Int, numEdges: Int) = {
-    this.numVertices = numVertices
-    this.numDeadEnds = numDeadEnds
-    this.numEdges = numEdges
-
-  }
-
   def addVertex(vId: Long, neighbors: Array[Edge[Double]]) = synchronized {
     srcVertexMap.put(vId, indexCounter)
-    offsets(indexCounter) = offsetCounter
-    lengths(indexCounter) = neighbors.length
+    offsets.insert(indexCounter, offsetCounter)
+    lengths.insert(indexCounter, neighbors.length)
     for (e <- 0 until neighbors.length) {
-      edges(offsetCounter) = (neighbors(e).dstId, neighbors(e).attr)
+      edges.insert(offsetCounter, (neighbors(e).dstId, neighbors(e).attr))
       offsetCounter += 1
     }
 
@@ -53,10 +35,10 @@ object GraphMap {
   def addVertex(vId: Long, neighbors: Array[(Long, Double)]): Unit = synchronized {
     if (!neighbors.isEmpty) {
       srcVertexMap.put(vId, indexCounter)
-      offsets(indexCounter) = offsetCounter
-      lengths(indexCounter) = neighbors.length
+      offsets.insert(indexCounter, offsetCounter)
+      lengths.insert(indexCounter, neighbors.length)
       for (e <- neighbors) {
-        edges(offsetCounter) = e
+        edges.insert(offsetCounter, e)
         offsetCounter += 1
       }
 
@@ -66,7 +48,7 @@ object GraphMap {
     }
   }
 
-  def addVertex(vId: Long) {
+  def addVertex(vId: Long): Unit = synchronized {
     srcVertexMap.put(vId, -1)
   }
 
@@ -83,12 +65,12 @@ object GraphMap {
     * structures that are initialy set by calling setUp function.
     */
   def reset {
-    numVertices = 0
-    numEdges = 0
-    numDeadEnds = 0
     indexCounter = 0
     offsetCounter = 0
     srcVertexMap.clear()
+    offsets.clear()
+    lengths.clear()
+    edges.clear()
   }
 
   def getNeighbors(vid: Long): Array[(Long, Double)] = {
@@ -99,7 +81,7 @@ object GraphMap {
         }
         val offset = offsets(index)
         val length = lengths(index)
-        edges.slice(offset, offset + length)
+        edges.slice(offset, offset + length).toArray
       case None => null
     }
   }

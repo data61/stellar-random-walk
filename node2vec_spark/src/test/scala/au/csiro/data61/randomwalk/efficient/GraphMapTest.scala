@@ -10,7 +10,6 @@ class GraphMapTest extends FunSuite {
     val e2 = Array(Edge(1, 3, 1.0))
     val e3 = Array(Edge(2, 3, 1.0))
     val e4 = Array(Edge(2, 1, 1.0))
-    GraphMap.setUp(3, 1, 4)
     var v2N = Array((1L, e1))
     GraphMap.addVertex(1, e1)
     GraphMap.addVertex(2)

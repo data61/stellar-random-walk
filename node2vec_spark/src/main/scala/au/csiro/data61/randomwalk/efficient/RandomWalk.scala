@@ -222,7 +222,7 @@ case class RandomWalk(context: SparkContext,
   }
 
   def sortPathPieces(pathsPieces: RDD[(Long, (Array[Long], Int))]) = {
-    pathsPieces.groupByKey(partitioner).mapPartitions({
+    pathsPieces.groupByKey(config.rddPartitions).mapPartitions({
       iter =>
         iter.map {
           case (_, it) =>

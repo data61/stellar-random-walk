@@ -8,6 +8,8 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{HashPartitioner, SparkContext}
 
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.util.control.Breaks._
 import scala.util.{Random, Try}
 
@@ -76,6 +78,8 @@ case class RandomWalk(context: SparkContext,
 
     logger.info(s"edges: $nEdges")
     logger.info(s"vertices: $nVertices")
+    println(s"edges: $nEdges")
+    println(s"vertices: $nVertices")
 
     vPaths
   }
@@ -121,7 +125,8 @@ case class RandomWalk(context: SparkContext,
     var totalPaths: RDD[List[Long]] = context.emptyRDD[List[Long]]
 
     for (_ <- 0 until numberOfWalks.value) {
-      var pathsPieces: RDD[(Long, (Array[Long], Int))] = context.emptyRDD
+      //      var pathsPieces: RDD[(Long, (Array[Long], Int))] = context.emptyRDD
+      val pathsPieces: mutable.ListBuffer[RDD[(Long, (Array[Long], Int))]] = ListBuffer.empty
       var newPaths: RDD[(Long, (Array[Long], Array[(Long, Double)], Long, Int))] =
         doFirsStepOfRandomWalk(initPaths, nextDouble)
       while (!newPaths.isEmpty()) {
@@ -166,14 +171,25 @@ case class RandomWalk(context: SparkContext,
         }, preservesPartitioning = true
         ).cache()
 
-        pathsPieces = mergeNewPaths(pathsPieces, newPaths, walkLength).cache()
-        newPaths = prepareWalkersToTransfer(filterUnfinishedWalkers(newPaths, walkLength))
-          .partitionBy(partitioner)
+        newPaths.count()
+        pathsPieces.append(newPaths.mapPartitions({ iter =>
+          iter.map {
+            case (_, (steps,
+            _, origin,
+            stepCounter)) =>
+              if (stepCounter == walkLength.value)
+                (origin, (steps, stepCounter))
+              else
+                (origin, (steps.slice(0, steps.length - 2), stepCounter))
+          }
+        }, preservesPartitioning = false).cache())
+        newPaths = prepareWalkersToTransfer(filterUnfinishedWalkers(newPaths, walkLength).cache())
+          .partitionBy(partitioner).cache()
         //        newPaths = transferWalkersToTheirPartitions(routingTable, prepareWalkersToTransfer
         //        (filterUnfinishedWalkers(newPaths, walkLength)))
       }
 
-      totalPaths = totalPaths.union(sortPathPieces(pathsPieces))
+      totalPaths = totalPaths.union(sortPathPieces(context.union(pathsPieces).cache()).cache())
         .persist(StorageLevel.MEMORY_AND_DISK)
 
     }
@@ -186,9 +202,7 @@ case class RandomWalk(context: SparkContext,
       iter.map { case (id, it) =>
         it.toList.sortBy(_._2).flatMap(_._1)
       }
-    }
-      , preservesPartitioning = true
-    )
+    }, preservesPartitioning = false)
   }
 
 
@@ -212,7 +226,7 @@ case class RandomWalk(context: SparkContext,
 
   def prepareWalkersToTransfer(walkers: RDD[(Long, (Array[Long], Array[(Long, Double)], Long,
     Int))]) = {
-    walkers.mapPartitions { iter =>
+    walkers.mapPartitions({ iter =>
       iter.map {
         case (_, (steps,
         prevNeighbors, origin,
@@ -220,7 +234,7 @@ case class RandomWalk(context: SparkContext,
           (steps.last, (steps.slice(steps.length - 2, steps.length), prevNeighbors, origin,
             stepCounter))
       }
-    }
+    }, preservesPartitioning = false)
 
   }
 
@@ -236,14 +250,29 @@ case class RandomWalk(context: SparkContext,
           else
             (origin, (steps.slice(0, steps.length - 2), stepCounter))
       }
-    }, preservesPartitioning = true))
+    }, preservesPartitioning = false))
   }
+
+  //  def mergeNewPaths(paths: RDD[(Long, (Array[Long], Int))], newPaths: RDD[(Long, (Array[Long],
+  //    Array[(Long, Double)], Long, Int))], walkLength: Broadcast[Int]) = {
+  //    paths.union(newPaths.mapPartitions({ iter =>
+  //      iter.map {
+  //        case (_, (steps,
+  //        _, origin,
+  //        stepCounter)) =>
+  //          if (stepCounter == walkLength.value)
+  //            (origin, (steps, stepCounter))
+  //          else
+  //            (origin, (steps.slice(0, steps.length - 2), stepCounter))
+  //      }
+  //    }, preservesPartitioning = true))
+  //  }
 
   def save(paths: RDD[List[Long]]) = {
 
     paths.map {
       case (path) =>
-        val pathString = path.mkString("\t")
+        val pathString = path.mkString(",")
         s"$pathString"
     }.repartition(config.rddPartitions).saveAsTextFile(s"${
       config.output

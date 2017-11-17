@@ -126,8 +126,8 @@ case class RandomWalk(context: SparkContext,
     for (_ <- 0 until numberOfWalks.value) {
       val pathsPieces: mutable.ListBuffer[RDD[(Long, (Array[Long], Int))]] = ListBuffer.empty
       var newPaths: RDD[(Long, (Array[Long], Array[(Long, Double)], Long, Int))] =
-        doFirsStepOfRandomWalk(initPaths, nextDouble)
-      var remainingWalkers = newPaths.count()
+        doFirsStepOfRandomWalk(initPaths, nextDouble).cache()
+      var remainingWalkers = Long.MaxValue
 
       val acc = context.longAccumulator("Error finder")
       val mAcc = context.collectionAccumulator[String]("Trace")
@@ -148,9 +148,9 @@ case class RandomWalk(context: SparkContext,
         pathsPieces.append(pieces)
 
         val remaining = transferWalkersToTheirPartitions(routingTable, prepareWalkersToTransfer
-        (filterUnfinishedWalkers(newPaths, walkLength))).cache()
+        (filterUnfinishedWalkers(newPaths, walkLength).cache()).cache())
         remainingWalkers = remaining.count()
-        newPaths = remaining
+        newPaths = remaining.persist(StorageLevel.MEMORY_AND_DISK)
         println(s"Remaining Walkers: $remainingWalkers")
         if (!acc.isZero) {
           println(s"Wrong Transports: ${acc.sum}")
@@ -205,7 +205,7 @@ case class RandomWalk(context: SparkContext,
           }
         }
           , preservesPartitioning = true
-        ).cache()
+        ).persist(StorageLevel.MEMORY_AND_DISK)
       }
       while (remainingWalkers != 0)
 

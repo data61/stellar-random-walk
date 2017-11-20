@@ -58,12 +58,21 @@ case class RandomWalk(context: SparkContext,
 
     val vAccum = context.longAccumulator("vertices")
     val eAccum = context.longAccumulator("edges")
-    val vPaths = g.mapPartitions({ iter =>
-      iter.map {
+
+    g.foreachPartition { iter =>
+      iter.foreach {
         case (vId: Long, (neighbors: Array[(Long, Double)])) =>
           GraphMap.addVertex(vId, neighbors)
           vAccum.add(1)
           eAccum.add(neighbors.length)
+      }
+    }
+    nVertices = vAccum.sum
+    nEdges = eAccum.sum
+
+    val vPaths = g.mapPartitions({ iter =>
+      iter.map {
+        case (vId: Long, _) =>
           (vId, Array(vId))
       }
     }, preservesPartitioning = true
@@ -72,8 +81,6 @@ case class RandomWalk(context: SparkContext,
     routingTable = buildRoutingTable(vPaths).persist(StorageLevel.MEMORY_AND_DISK)
 
     vPaths.count()
-    nVertices = vAccum.sum
-    nEdges = eAccum.sum
 
     logger.info(s"edges: $nEdges")
     logger.info(s"vertices: $nVertices")
@@ -125,14 +132,14 @@ case class RandomWalk(context: SparkContext,
 
     for (_ <- 0 until numberOfWalks.value) {
       val pathsPieces: mutable.ListBuffer[RDD[(Long, (Array[Long], Int))]] = ListBuffer.empty
-      var newPaths: RDD[(Long, (Array[Long], Array[(Long, Double)], Long, Int))] =
+      var unfinishedWalkers: RDD[(Long, (Array[Long], Array[(Long, Double)], Long, Int))] =
         doFirsStepOfRandomWalk(initPaths, nextDouble).cache()
       var remainingWalkers = Long.MaxValue
 
       val acc = context.longAccumulator("Error finder")
-      val mAcc = context.collectionAccumulator[String]("Trace")
+//      val mAcc = context.collectionAccumulator[String]("Trace")
       do {
-        val pieces = newPaths.mapPartitions({ iter =>
+        val pieces = unfinishedWalkers.mapPartitions({ iter =>
           iter.map {
             case (_, (steps,
             _, origin,
@@ -147,28 +154,30 @@ case class RandomWalk(context: SparkContext,
         pieces.count()
         pathsPieces.append(pieces)
 
-        val remaining = transferWalkersToTheirPartitions(routingTable, prepareWalkersToTransfer
-        (filterUnfinishedWalkers(newPaths, walkLength).cache()).cache())
-        remainingWalkers = remaining.count()
-        newPaths = remaining.persist(StorageLevel.MEMORY_AND_DISK)
-        println(s"Remaining Walkers: $remainingWalkers")
+        unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
+          prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers, walkLength).cache()
+          ).cache()).persist(StorageLevel.MEMORY_AND_DISK)
+        val oldCount = remainingWalkers
+        remainingWalkers = unfinishedWalkers.count()
+        if (remainingWalkers > oldCount) {
+          logger.warn(s"Inconsistent state: number of unfinished walkers was increased!")
+          println(s"Inconsistent state: number of unfinished walkers was increased!")
+        }
+        println(s"Unfinished Walkers: $remainingWalkers")
         if (!acc.isZero) {
           println(s"Wrong Transports: ${acc.sum}")
-          println
-          (s"Trace: ${mAcc.value.toArray.mkString("\n")}")
+//          println(s"Trace: ${mAcc.value.toArray.mkString("\n")}")
           acc.reset()
-          mAcc.reset()
+//          mAcc.reset()
         }
 
-        //      while (remainingWalkers != 0) {
-        newPaths = newPaths.mapPartitions({ iter =>
+        unfinishedWalkers = unfinishedWalkers.mapPartitions({ iter =>
           iter.map { case (src: Long, (steps: Array[Long], prevNeighbors: Array[(Long, Double)],
           origin: Long, numSteps: Int)) =>
             var path = steps
             var stepCounter = numSteps
             val rSample = RandomSample(nextDouble)
             var pNeighbors = prevNeighbors
-            //            if (path.length > 1) {
             breakable {
               while (stepCounter < walkLength.value) {
                 val curr = path.last
@@ -191,7 +200,7 @@ case class RandomWalk(context: SparkContext,
                 } else {
                   if (path.length == 2) {
                     acc.add(1)
-                    mAcc.add(s"Path=${path.mkString("->")}\t head=$src\t numSteps=$stepCounter")
+//                    mAcc.add(s"Path=${path.mkString("->")}\t head=$src\t numSteps=$stepCounter")
                   }
                   // The walker has reached to the edge of the partition. Needs a ride to
                   // another

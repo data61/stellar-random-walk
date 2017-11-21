@@ -55,6 +55,8 @@ case class RandomWalk(context: SparkContext,
       partitionBy(partitioner).
       persist(StorageLevel.MEMORY_AND_DISK) // TODO: Apply a smart graph partition strategy
 
+    routingTable = buildRoutingTable(g).persist(StorageLevel.MEMORY_ONLY)
+    routingTable.count()
 
     val vAccum = context.longAccumulator("vertices")
     val eAccum = context.longAccumulator("edges")
@@ -62,7 +64,6 @@ case class RandomWalk(context: SparkContext,
     g.foreachPartition { iter =>
       iter.foreach {
         case (vId: Long, (neighbors: Array[(Long, Double)])) =>
-          GraphMap.addVertex(vId, neighbors)
           vAccum.add(1)
           eAccum.add(neighbors.length)
       }
@@ -70,35 +71,29 @@ case class RandomWalk(context: SparkContext,
     nVertices = vAccum.sum
     nEdges = eAccum.sum
 
-    val vPaths = g.mapPartitions({ iter =>
-      iter.map {
-        case (vId: Long, _) =>
-          (vId, Array(vId))
-      }
-    }, preservesPartitioning = true
-    ).cache()
-
-    routingTable = buildRoutingTable(vPaths).persist(StorageLevel.MEMORY_AND_DISK)
-
-    vPaths.count()
-
     logger.info(s"edges: $nEdges")
     logger.info(s"vertices: $nVertices")
     println(s"edges: $nEdges")
     println(s"vertices: $nVertices")
 
-    vPaths
+    g.mapPartitions({ iter =>
+      iter.map {
+        case (vId: Long, _) =>
+          (vId, Array(vId))
+      }
+    }, preservesPartitioning = true
+    )
   }
 
-  def buildRoutingTable(graph: RDD[(Long, Array[Long])]): RDD[Int] = {
-    graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Long, _)]) =>
-      iter.map {
-        case (_, _) =>
-          id
+  def buildRoutingTable(graph: RDD[(Long, (Array[(Long, Double)]))]): RDD[Int] = {
+    graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Long, (Array[(Long, Double)]))]) =>
+      iter.foreach { case (vId, neighbors) =>
+        if (GraphMap.getNeighbors(vId) == null)
+          GraphMap.addVertex(vId, neighbors)
+        id
       }
       Iterator.empty
-    }
-      , preservesPartitioning = true
+    }, preservesPartitioning = true
     )
   }
 
@@ -133,11 +128,11 @@ case class RandomWalk(context: SparkContext,
     for (_ <- 0 until numberOfWalks.value) {
       val pathsPieces: mutable.ListBuffer[RDD[(Long, (Array[Long], Int))]] = ListBuffer.empty
       var unfinishedWalkers: RDD[(Long, (Array[Long], Array[(Long, Double)], Long, Int))] =
-        doFirsStepOfRandomWalk(initPaths, nextDouble).cache()
+        doFirsStepOfRandomWalk(initPaths, nextDouble)
       var remainingWalkers = Long.MaxValue
 
       val acc = context.longAccumulator("Error finder")
-//      val mAcc = context.collectionAccumulator[String]("Trace")
+      val acc2 = context.longAccumulator("Error finder")
       do {
         val pieces = unfinishedWalkers.mapPartitions({ iter =>
           iter.map {
@@ -149,14 +144,13 @@ case class RandomWalk(context: SparkContext,
               else
                 (origin, (steps.slice(0, steps.length - 2), stepCounter))
           }
-        }, preservesPartitioning = false).persist(StorageLevel.MEMORY_AND_DISK)
+        }, preservesPartitioning = false)
 
         pieces.count()
         pathsPieces.append(pieces)
 
         unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
-          prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers, walkLength).cache()
-          ).cache()).persist(StorageLevel.MEMORY_AND_DISK)
+          prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers, walkLength)))
         val oldCount = remainingWalkers
         remainingWalkers = unfinishedWalkers.count()
         if (remainingWalkers > oldCount) {
@@ -164,11 +158,11 @@ case class RandomWalk(context: SparkContext,
           println(s"Inconsistent state: number of unfinished walkers was increased!")
         }
         println(s"Unfinished Walkers: $remainingWalkers")
-        if (!acc.isZero) {
+        if (!acc.isZero || !acc2.isZero) {
           println(s"Wrong Transports: ${acc.sum}")
-//          println(s"Trace: ${mAcc.value.toArray.mkString("\n")}")
+          println(s"Zero Neighbors: ${acc2.sum}")
           acc.reset()
-//          mAcc.reset()
+          acc2.reset()
         }
 
         unfinishedWalkers = unfinishedWalkers.mapPartitions({ iter =>
@@ -194,13 +188,13 @@ case class RandomWalk(context: SparkContext,
                     path = path ++ Array(nextStep)
                   } else {
                     stepCounter = walkLength.value
+                    acc2.add(1)
                     break
                     // This walker has reached a deadend. Needs to stop.
                   }
                 } else {
                   if (path.length == 2) {
                     acc.add(1)
-//                    mAcc.add(s"Path=${path.mkString("->")}\t head=$src\t numSteps=$stepCounter")
                   }
                   // The walker has reached to the edge of the partition. Needs a ride to
                   // another

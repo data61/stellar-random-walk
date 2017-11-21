@@ -85,9 +85,9 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
   }
 
   test("buildRoutingTable") {
-    val v1 = (1L, Array.empty[Long])
-    val v2 = (2L, Array.empty[Long])
-    val v3 = (3L, Array.empty[Long])
+    val v1 = (1L, Array.empty[(Long, Double)])
+    val v2 = (2L, Array.empty[(Long, Double)])
+    val v3 = (3L, Array.empty[(Long, Double)])
     val numPartitions = 3
     val partitioner = new HashPartitioner(numPartitions)
 
@@ -109,9 +109,9 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
 
   test("transferWalkersToTheirPartitions") {
 
-    val v1 = (1L, Array.empty[Long])
-    val v2 = (2L, Array.empty[Long])
-    val v3 = (3L, Array.empty[Long])
+    val v1 = (1L, Array.empty[(Long, Double)])
+    val v2 = (2L, Array.empty[(Long, Double)])
+    val v3 = (3L, Array.empty[(Long, Double)])
     val numPartitions = 8
 
     val config = Params(rddPartitions = numPartitions)

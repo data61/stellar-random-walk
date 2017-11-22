@@ -126,9 +126,15 @@ case class RandomWalk(context: SparkContext,
     var totalPaths: RDD[List[Long]] = context.emptyRDD[List[Long]]
 
     for (_ <- 0 until numberOfWalks.value) {
-      val pathsPieces: mutable.ListBuffer[RDD[(Long, (Array[Long], Int))]] = ListBuffer.empty
+      //      val pathsPieces: mutable.ListBuffer[RDD[(Long, (Array[Long], Int))]] = ListBuffer
+      // .empty
+      var pathsPieces: RDD[(Long, (Array[Long], Int))] = context.emptyRDD[(Long, (Array[Long],
+        Int))]
       var unfinishedWalkers: RDD[(Long, (Array[Long], Array[(Long, Double)], Long, Int))] =
         doFirsStepOfRandomWalk(initPaths, nextDouble)
+      var prevUnfinished: RDD[(Long, (Array[Long], Array[(Long, Double)], Long, Int))] = context
+        .emptyRDD[(Long, (Array[Long], Array[(Long, Double)], Long, Int))]
+      var prevPices = context.emptyRDD[(Long, (Array[Long], Int))]
       var remainingWalkers = Long.MaxValue
 
       val acc = context.longAccumulator("Error finder")
@@ -147,12 +153,18 @@ case class RandomWalk(context: SparkContext,
         }, preservesPartitioning = false)
 
         //        pieces.count()
-        pathsPieces.append(pieces)
+//        pathsPieces.append(pieces)
 
+        prevPices = pathsPieces
+        pathsPieces = context.union(pathsPieces,pieces).persist(StorageLevel.MEMORY_AND_DISK)
+        pathsPieces.count()
+        prevPices.unpersist(blocking = false)
+        prevUnfinished = unfinishedWalkers
         unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
           prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers, walkLength)))
         val oldCount = remainingWalkers
         remainingWalkers = unfinishedWalkers.count()
+        prevUnfinished.unpersist(blocking = false)
         if (remainingWalkers > oldCount) {
           logger.warn(s"Inconsistent state: number of unfinished walkers was increased!")
           println(s"Inconsistent state: number of unfinished walkers was increased!")
@@ -212,11 +224,11 @@ case class RandomWalk(context: SparkContext,
       }
       while (remainingWalkers != 0)
 
-      val allPieces = context.union(pathsPieces).persist(StorageLevel.MEMORY_AND_DISK)
-      println(s"Total created path pieces: ${allPieces.count()}")
-      pathsPieces.foreach(piece => piece.unpersist(blocking = false))
+//      val allPieces = context.union(pathsPieces).persist(StorageLevel.MEMORY_AND_DISK)
+//      println(s"Total created path pieces: ${allPieces.count()}")
+//      pathsPieces.foreach(piece => piece.unpersist(blocking = false))
 
-      totalPaths = totalPaths.union(sortPathPieces(allPieces)).persist(StorageLevel
+      totalPaths = totalPaths.union(sortPathPieces(pathsPieces)).persist(StorageLevel
         .MEMORY_AND_DISK)
       //      totalPaths = totalPaths.union(sortPathPieces(context.union(pathsPieces)))
       //        .persist(StorageLevel.MEMORY_AND_DISK)

@@ -146,7 +146,7 @@ case class RandomWalk(context: SparkContext,
           }
         }, preservesPartitioning = false)
 
-        pieces.count()
+        //        pieces.count()
         pathsPieces.append(pieces)
 
         unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
@@ -214,9 +214,12 @@ case class RandomWalk(context: SparkContext,
 
       val allPieces = context.union(pathsPieces).persist(StorageLevel.MEMORY_AND_DISK)
       println(s"Total created path pieces: ${allPieces.count()}")
-      totalPaths = totalPaths.union(sortPathPieces(allPieces).persist(StorageLevel
-        .MEMORY_AND_DISK))
-        .persist(StorageLevel.MEMORY_AND_DISK)
+      pathsPieces.foreach(piece => piece.unpersist(blocking = false))
+
+      totalPaths = totalPaths.union(sortPathPieces(allPieces)).persist(StorageLevel
+        .MEMORY_AND_DISK)
+      //      totalPaths = totalPaths.union(sortPathPieces(context.union(pathsPieces)))
+      //        .persist(StorageLevel.MEMORY_AND_DISK)
       totalPaths.count()
 
     }

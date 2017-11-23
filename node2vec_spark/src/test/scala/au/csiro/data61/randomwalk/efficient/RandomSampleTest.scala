@@ -8,11 +8,12 @@ class RandomSampleTest extends FunSuite {
   // TODO assert can move to a function for DRY purpose.
   test("Test random sample function") {
     var rValue = 0.1
+    val pId = 0
     var random = RandomSample(nextDouble = () => rValue)
     assert(random.nextDouble() == rValue)
-    val e1 = (1L, 1.0)
-    val e2 = (2L, 1.0)
-    val e3 = (3L, 1.0)
+    val e1 = (1L, pId, 1.0)
+    val e2 = (2L, pId,1.0)
+    val e3 = (3L, pId,1.0)
     val edges = Array(e1, e2, e3)
     assert(random.sample(edges) == e1)
     rValue = 0.4
@@ -24,13 +25,14 @@ class RandomSampleTest extends FunSuite {
   }
 
   test("Test second order random selection") {
+    val pId = 0
     val w1 = 1.0
-    val e12 = (2L, w1)
-    val e21 = (1L, w1)
-    val e23 = (3L, w1)
-    val e24 = (4L, w1)
-    val e14 = (4L, w1)
-    val e15 = (5L, w1)
+    val e12 = (2L, pId, w1)
+    val e21 = (1L, pId, w1)
+    val e23 = (3L, pId, w1)
+    val e24 = (4L, pId,  w1)
+    val e14 = (4L, pId, w1)
+    val e15 = (5L, pId, w1)
 
     val prevId = 1
     var prevNeighbors = Array(e12, e14, e15)

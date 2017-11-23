@@ -40,6 +40,7 @@ object Main {
                     output: String = null,
                     useKyroSerializer: Boolean = false,
                     rddPartitions: Int = 200,
+                    partitioned: Boolean = false,
                     cmd: Command = Command.node2vec) extends AbstractParams[Params] with
     Serializable
 
@@ -98,6 +99,9 @@ object Main {
     opt[Boolean]("kryo")
       .text(s"Whether to use kryo serializer or not: ${defaultParams.useKyroSerializer}")
       .action((x, c) => c.copy(useKyroSerializer = x))
+    opt[Boolean]("partitioned")
+      .text(s"Whether the graph is partitioned: ${defaultParams.partitioned}")
+      .action((x, c) => c.copy(partitioned = x))
     note(
       """
         |For example, the following command runs this app on a synthetic dataset:

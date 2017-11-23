@@ -17,21 +17,21 @@ object GraphMap {
   private lazy val vertexPartitionMap: mutable.Map[Long, Int] = new HashMap[Long, Int]()
   private lazy val offsets: ArrayBuffer[Int] = new ArrayBuffer()
   private lazy val lengths: ArrayBuffer[Int] = new ArrayBuffer()
-  private lazy val edges: ArrayBuffer[(Long, Int, Double)] = new ArrayBuffer()
+  private lazy val edges: ArrayBuffer[(Long, Double)] = new ArrayBuffer()
   private var indexCounter: Int = 0
   private var offsetCounter: Int = 0
 
-  //  def addVertex(vId: Long, neighbors: Array[Edge[Double]]) = synchronized {
-  //    srcVertexMap.put(vId, indexCounter)
-  //    offsets.insert(indexCounter, offsetCounter)
-  //    lengths.insert(indexCounter, neighbors.length)
-  //    for (e <- 0 until neighbors.length) {
-  //      edges.insert(offsetCounter, (neighbors(e).dstId, neighbors(e).attr))
-  //      offsetCounter += 1
-  //    }
-  //
-  //    indexCounter += 1
-  //  }
+    def addVertex(vId: Long, neighbors: Array[Edge[Double]]) = synchronized {
+      srcVertexMap.put(vId, indexCounter)
+      offsets.insert(indexCounter, offsetCounter)
+      lengths.insert(indexCounter, neighbors.length)
+      for (e <- 0 until neighbors.length) {
+        edges.insert(offsetCounter, (neighbors(e).dstId, neighbors(e).attr))
+        offsetCounter += 1
+      }
+
+      indexCounter += 1
+    }
 
   def addVertex(vId: Long, neighbors: Array[(Long, Int, Double)]): Unit = synchronized {
     srcVertexMap.get(vId) match {
@@ -40,10 +40,10 @@ object GraphMap {
           srcVertexMap.put(vId, indexCounter)
           offsets.insert(indexCounter, offsetCounter)
           lengths.insert(indexCounter, neighbors.length)
-          for (e <- neighbors) {
-            edges.insert(offsetCounter, e)
+          for ((dst, pId, weight) <- neighbors) {
+            edges.insert(offsetCounter, (dst, weight))
             offsetCounter += 1
-            vertexPartitionMap.put(e._1, e._2)
+            vertexPartitionMap.put(dst, pId)
           }
 
           indexCounter += 1
@@ -84,11 +84,11 @@ object GraphMap {
     edges.clear()
   }
 
-  def getNeighbors(vid: Long): Array[(Long, Int, Double)] = {
+  def getNeighbors(vid: Long): Array[(Long, Double)] = {
     srcVertexMap.get(vid) match {
       case Some(index) =>
         if (index == -1) {
-          return Array.empty[(Long, Int, Double)]
+          return Array.empty[(Long, Double)]
         }
         val offset = offsets(index)
         val length = lengths(index)

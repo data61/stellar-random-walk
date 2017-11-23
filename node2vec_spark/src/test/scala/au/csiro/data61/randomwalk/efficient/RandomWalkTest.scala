@@ -121,9 +121,9 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val graph = sc.parallelize(Array(v1, v2, v3)).partitionBy(partitioner)
     val rTable = rw.buildRoutingTable(graph)
 
-    val w1 = (pId, (1L, Array.empty[Long], Array.empty[(Long, Int, Double)], 1L, 1))
-    val w2 = (pId, (2L, Array.empty[Long], Array.empty[(Long, Int, Double)], 2L, 2))
-    val w3 = (pId, (3L, Array.empty[Long], Array.empty[(Long, Int, Double)], 3L, 3))
+    val w1 = (pId, (1L, Array.empty[Long], Array.empty[(Long, Double)], 1L, 1))
+    val w2 = (pId, (2L, Array.empty[Long], Array.empty[(Long, Double)], 2L, 2))
+    val w3 = (pId, (3L, Array.empty[Long], Array.empty[(Long, Double)], 3L, 3))
 
     val walkers = sc.parallelize(Array(w3, w1, w2)).partitionBy(partitioner)
     val tWalkers = rw.transferWalkersToTheirPartitions(rTable, walkers)
@@ -147,13 +147,13 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val p12 = Array(3L, last1)
     val op1 = 1L
     val wl1 = 5
-    val w1 = (pId, (op1, p11 ++ p12, Array.empty[(Long, Int, Double)], op1, wl1))
+    val w1 = (pId, (op1, p11 ++ p12, Array.empty[(Long, Double)], op1, wl1))
     val p21 = Array.empty[Long]
     val last2 = 5L
     val p22 = Array(2L, last2)
     val op2 = 2L
     val wl2 = 2
-    val w2 = (pId, (op2, p21 ++ p22, Array.empty[(Long, Int, Double)], op2, wl2))
+    val w2 = (pId, (op2, p21 ++ p22, Array.empty[(Long, Double)], op2, wl2))
 
     val walkers = sc.parallelize(Array(w1, w2))
 
@@ -161,16 +161,16 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
 
     val preparedWalkers = rw.prepareWalkersToTransfer(walkers).collect()
     assert(preparedWalkers.length == 2)
-    val l1 = preparedWalkers.filter(_._2._1==last1)(0)._2
-////    assert(map.get(last1) match {
-////      case Some(w) => (w._2 sameElements p12) && (w._4 == op1) && (w._5 == wl1)
-////      case None => false
-////    })
-    assert ((l1._2 sameElements p12) && (l1._4 == op1) && (l1._5 == wl1))
-//
-    val l2 = preparedWalkers.filter(_._2._1==last2)(0)._2
-    assert ((l2._2 sameElements p22) && (l2._4 == op2) && (l2._5 == wl2))
-//    assert(map.get(last2) match {
+    val l1 = preparedWalkers.filter(_._2._1 == last1)(0)._2
+    ////    assert(map.get(last1) match {
+    ////      case Some(w) => (w._2 sameElements p12) && (w._4 == op1) && (w._5 == wl1)
+    ////      case None => false
+    ////    })
+    assert((l1._2 sameElements p12) && (l1._4 == op1) && (l1._5 == wl1))
+    //
+    val l2 = preparedWalkers.filter(_._2._1 == last2)(0)._2
+    assert((l2._2 sameElements p22) && (l2._4 == op2) && (l2._5 == wl2))
+    //    assert(map.get(last2) match {
     //      case Some(w) => (w._2 sameElements p22) && (w._4 == op2) && (w._5 == wl2)
     //      case None => false
     //    })
@@ -185,12 +185,12 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val walkLength = sc.broadcast(4)
     val fP1 = Array(1L, 2L, 3L)
     val oP1 = 1L
-    val p1 = (1L, (fP1, Array.empty[(Long, Int, Double)], oP1, walkLength.value))
+    val p1 = (1L, (fP1, Array.empty[(Long, Double)], oP1, walkLength.value))
     val p21 = Array(2L)
     val p22 = Array(4L, 5L)
     val oP2 = 2L
     val wl21 = 3
-    var p2 = (2L, (p21 ++ p22, Array.empty[(Long, Int, Double)], oP2, wl21))
+    var p2 = (2L, (p21 ++ p22, Array.empty[(Long, Double)], oP2, wl21))
     var newPaths = sc.parallelize(Array(p1, p2))
 
     val rw = RandomWalk(sc, Params())
@@ -211,7 +211,7 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     // Merge with a non-empty paths RDD
     val wl22 = 4
     val p23 = Array(6L)
-    p2 = (2L, (p22 ++ p23, Array.empty[(Long, Int, Double)], oP2, wl22))
+    p2 = (2L, (p22 ++ p23, Array.empty[(Long, Double)], oP2, wl22))
     newPaths = sc.parallelize(Array(p2))
 
     paths = rw.mergeNewPaths(paths, newPaths, walkLength)
@@ -259,9 +259,9 @@ class RandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
   test("filterUnfinishedWalkers") {
     val walkLength = sc.broadcast(4)
     val pId = 0
-    val p1 = (pId, (1L, Array.empty[Long], Array.empty[(Long, Int, Double)], 1L, walkLength.value))
-    val p2 = (pId, (2L, Array.empty[Long], Array.empty[(Long, Int, Double)], 2L, walkLength.value - 2))
-    val p3 = (pId, (3L, Array.empty[Long], Array.empty[(Long, Int, Double)], 3L, walkLength.value - 1))
+    val p1 = (pId, (1L, Array.empty[Long], Array.empty[(Long, Double)], 1L, walkLength.value))
+    val p2 = (pId, (2L, Array.empty[Long], Array.empty[(Long, Double)], 2L, walkLength.value - 2))
+    val p3 = (pId, (3L, Array.empty[Long], Array.empty[(Long, Double)], 3L, walkLength.value - 1))
     val walkers = sc.parallelize(Array(p1, p2, p3))
 
     val rw = RandomWalk(sc, Params())

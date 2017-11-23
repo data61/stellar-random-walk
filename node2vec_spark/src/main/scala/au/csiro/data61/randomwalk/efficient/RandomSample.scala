@@ -9,16 +9,16 @@ case class RandomSample(nextDouble: () => Double = Random.nextDouble) extends Se
     *
     * @return
     */
-  final def sample(edges: Array[(Long, Int, Double)]): (Long, Int, Double) = {
+  final def sample(edges: Array[(Long, Double)]): (Long, Double) = {
 
-    val sum = edges.foldLeft(0.0) { case (w1, (dstId, pId, w2)) => w1 + w2 }
+    val sum = edges.foldLeft(0.0) { case (w1, (_, w2)) => w1 + w2 }
 
     val p = nextDouble()
     var acc = 0.0
-    for ((dstId, pId, w) <- edges) {
+    for ((dstId, w) <- edges) {
       acc += w / sum
       if (acc >= p)
-        return (dstId, pId, w)
+        return (dstId, w)
     }
 
     edges.head
@@ -27,17 +27,17 @@ case class RandomSample(nextDouble: () => Double = Random.nextDouble) extends Se
   final def computeSecondOrderWeights(p: Double = 1.0,
                                       q: Double = 1.0,
                                       prevId: Long,
-                                      prevNeighbors: Array[(Long, Int, Double)],
-                                      currNeighbors: Array[(Long, Int, Double)]): Array[(Long,
-    Int, Double)] = {
-    currNeighbors.map { case (dstId, pId, w) =>
+                                      prevNeighbors: Array[(Long, Double)],
+                                      currNeighbors: Array[(Long, Double)]): Array[(Long, Double)
+    ] = {
+    currNeighbors.map { case (dstId, w) =>
       var unnormProb = w / q // Default is that there is no direct link between src and
       // dstNeighbor.
       if (dstId == prevId) unnormProb = w / p // If the dstNeighbor is the src node.
       else {
         if (prevNeighbors.exists(_._1 == dstId)) unnormProb = w
       }
-      (dstId, pId, unnormProb)
+      (dstId, unnormProb)
     } // If there is a
     // direct link from src to neighborDst. Note, that the weight of the direct link is always
     // considered, which does not necessarily is the shortest path.
@@ -55,8 +55,8 @@ case class RandomSample(nextDouble: () => Double = Random.nextDouble) extends Se
   final def secondOrderSample(p: Double = 1.0,
                               q: Double = 1.0,
                               prevId: Long,
-                              prevNeighbors: Array[(Long, Int, Double)],
-                              currNeighbors: Array[(Long, Int, Double)]): (Long, Int, Double) = {
+                              prevNeighbors: Array[(Long, Double)],
+                              currNeighbors: Array[(Long, Double)]): (Long, Double) = {
     val newCurrentNeighbors = computeSecondOrderWeights(p, q, prevId, prevNeighbors, currNeighbors)
     sample(newCurrentNeighbors)
   }

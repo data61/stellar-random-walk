@@ -15,20 +15,18 @@ case class RandomWalk(context: SparkContext,
                       config: Main.Params) extends Serializable {
 
   lazy val logger = LogManager.getLogger("rwLogger")
-  var nVertices: Long = 0
-  var nEdges: Long = 0
+  var nVertices: Int = 0
+  var nEdges: Int = 0
   val partitioner = new HashPartitioner(config.rddPartitions)
   var routingTable = context.emptyRDD[Int]
 
-  def loadGraph(): RDD[(Int, (Long, Array[Long]))] = {
+  def loadGraph(): RDD[(Int, (Int, Array[Int]))] = {
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
     val bcRddPartitions = context.broadcast(config.rddPartitions)
 
-    val edgePartitions: RDD[(Long, (Array[(Long, Int, Double)], Int))] = context.textFile(config
-      .input, minPartitions
-      = config
-      .rddPartitions).flatMap { triplet =>
+    val edgePartitions: RDD[(Int, (Array[(Int, Int, Float)], Int))] = context.textFile(config
+      .input, minPartitions = config.rddPartitions).flatMap { triplet =>
       val parts = triplet.split("\\s+")
 
       val pId: Int = parts.length > 2 match {
@@ -38,14 +36,14 @@ case class RandomWalk(context: SparkContext,
 
       // if the weights are not specified it sets it to 1.0
       val weight = bcWeighted.value && parts.length > 3 match {
-        case true => Try(parts.last.toDouble).getOrElse(1.0)
-        case false => 1.0
+        case true => Try(parts.last.toFloat).getOrElse(1.0f)
+        case false => 1.0f
       }
 
-      val (src, dst) = (parts.head.toLong, parts(1).toLong)
+      val (src, dst) = (parts.head.toInt, parts(1).toInt)
       val srcTuple = (src, (Array((dst, pId, weight)), pId))
       if (bcDirected.value) {
-        Array(srcTuple, (dst, (Array.empty[(Long, Int, Double)], pId)))
+        Array(srcTuple, (dst, (Array.empty[(Int, Int, Float)], pId)))
       } else {
         Array(srcTuple, (dst, (Array((src, pId, weight)), pId)))
       }
@@ -59,7 +57,7 @@ case class RandomWalk(context: SparkContext,
 
     val vertexNeighbors = edgePartitions.reduceByKey((x, y) => (x._1 ++ y._1, x._2)).cache
 
-    val g: RDD[(Int, (Long, Array[(Long, Int, Double)]))] =
+    val g: RDD[(Int, (Int, Array[(Int, Int, Float)]))] =
       vertexPartitions.join(vertexNeighbors).map {
         case (v, (pId, (neighbors, _))) => (pId, (v, neighbors))
       }.partitionBy(partitioner)
@@ -72,13 +70,13 @@ case class RandomWalk(context: SparkContext,
 
     vertexNeighbors.foreachPartition { iter =>
       iter.foreach {
-        case (_, (neighbors: Array[(Long, Int, Double)], _)) =>
+        case (_, (neighbors: Array[(Int, Int, Float)], _)) =>
           vAccum.add(1)
           eAccum.add(neighbors.length)
       }
     }
-    nVertices = vAccum.sum
-    nEdges = eAccum.sum
+    nVertices = vAccum.sum.toInt
+    nEdges = eAccum.sum.toInt
 
     logger.info(s"edges: $nEdges")
     logger.info(s"vertices: $nVertices")
@@ -86,24 +84,24 @@ case class RandomWalk(context: SparkContext,
     println(s"vertices: $nVertices")
 
     val walkers = vertexNeighbors.map {
-      case (vId: Long, (_, pId: Int)) =>
+      case (vId: Int, (_, pId: Int)) =>
         (pId, (vId, Array(vId)))
     }
 
     initWalkersToTheirPartitions(routingTable, walkers).persist(StorageLevel.MEMORY_AND_DISK)
   }
 
-  def initWalkersToTheirPartitions(routingTable: RDD[Int], walkers: RDD[(Int, (Long,
-    Array[Long]))]) = {
+  def initWalkersToTheirPartitions(routingTable: RDD[Int], walkers: RDD[(Int, (Int,
+    Array[Int]))]) = {
     routingTable.zipPartitions(walkers.partitionBy(partitioner)) {
       (_, iter2) =>
         iter2
     }
   }
 
-  def buildRoutingTable(graph: RDD[(Int, (Long, Array[(Long, Int, Double)]))]): RDD[Int] = {
-    graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, (Long, Array[(Long, Int,
-      Double)]))]) =>
+  def buildRoutingTable(graph: RDD[(Int, (Int, Array[(Int, Int, Float)]))]): RDD[Int] = {
+    graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, (Int, Array[(Int, Int,
+      Float)]))]) =>
       iter.foreach { case (_, (vId, neighbors)) =>
         GraphMap.addVertex(vId, neighbors)
         id
@@ -113,7 +111,7 @@ case class RandomWalk(context: SparkContext,
     )
   }
 
-  //  def initRandomWalk(g: RDD[(Int, (Long, Array[(Long, Double)]))]) = {
+  //  def initRandomWalk(g: RDD[(Int, (Int, Array[(Int, Float)]))]) = {
   //    routingTable = buildRoutingTable(g).persist(StorageLevel.MEMORY_ONLY)
   //    routingTable.count()
   //
@@ -122,7 +120,7 @@ case class RandomWalk(context: SparkContext,
   //
   //    g.foreachPartition { iter =>
   //      iter.foreach {
-  //        case (vId: Long, (_, neighbors: Array[(Long, Double)])) =>
+  //        case (vId: Int, (_, neighbors: Array[(Int, Float)])) =>
   //          vAccum.add(1)
   //          eAccum.add(neighbors.length)
   //      }
@@ -137,7 +135,7 @@ case class RandomWalk(context: SparkContext,
   //
   //    g.mapPartitions({ iter =>
   //      iter.map {
-  //        case (vId: Long, _) =>
+  //        case (vId: Int, _) =>
   //          (vId, Array(vId))
   //      }
   //    }, preservesPartitioning = true
@@ -149,26 +147,26 @@ case class RandomWalk(context: SparkContext,
   //    *
   //    * @return
   //    */
-  //  def loadGraph(): RDD[(Long, Array[Long])] = {
+  //  def loadGraph(): RDD[(Int, Array[Int])] = {
   //    // the directed and weighted parameters are only used for building the graph object.
   //    // is directed? they will be shared among stages and executors
   //    val bcDirected = context.broadcast(config.directed)
   //    val bcWeighted = context.broadcast(config.weighted) // is weighted?
   //
-  //    val g: RDD[(Long, Array[(Long, Double)])] = context.textFile(config.input, minPartitions
+  //    val g: RDD[(Int, Array[(Int, Float)])] = context.textFile(config.input, minPartitions
   //      = config
   //      .rddPartitions).flatMap { triplet =>
   //      val parts = triplet.split("\\s+")
   //      // if the weights are not specified it sets it to 1.0
   //
   //      val weight = bcWeighted.value && parts.length > 2 match {
-  //        case true => Try(parts.last.toDouble).getOrElse(1.0)
+  //        case true => Try(parts.last.toFloat).getOrElse(1.0)
   //        case false => 1.0
   //      }
   //
-  //      val (src, dst) = (parts.head.toLong, parts(1).toLong)
+  //      val (src, dst) = (parts.head.toInt, parts(1).toInt)
   //      if (bcDirected.value) {
-  //        Array((src, Array((dst, weight))), (dst, Array.empty[(Long, Double)]))
+  //        Array((src, Array((dst, weight))), (dst, Array.empty[(Int, Float)]))
   //      } else {
   //        Array((src, Array((dst, weight))), (dst, Array((src, weight))))
   //      }
@@ -185,7 +183,7 @@ case class RandomWalk(context: SparkContext,
   //
   //    g.foreachPartition { iter =>
   //      iter.foreach {
-  //        case (vId: Long, (neighbors: Array[(Long, Double)])) =>
+  //        case (vId: Int, (neighbors: Array[(Int, Float)])) =>
   //          vAccum.add(1)
   //          eAccum.add(neighbors.length)
   //      }
@@ -200,54 +198,54 @@ case class RandomWalk(context: SparkContext,
   //
   //    g.mapPartitions({ iter =>
   //      iter.map {
-  //        case (vId: Long, _) =>
+  //        case (vId: Int, _) =>
   //          (vId, Array(vId))
   //      }
   //    }, preservesPartitioning = true
   //    )
   //  }
 
-  def doFirsStepOfRandomWalk(paths: RDD[(Int, (Long, Array[Long]))], nextDouble: () =>
-    Double = Random.nextDouble): RDD[(Int, (Long, Array[Long], Array[(Long, Double)], Long,
+  def doFirsStepOfRandomWalk(paths: RDD[(Int, (Int, Array[Int]))], nextFloat: () =>
+    Float = Random.nextFloat): RDD[(Int, (Int, Array[Int], Array[(Int, Float)], Int,
     Int))] = {
     val walkLength = context.broadcast(config.walkLength)
     paths.mapPartitions({ iter =>
       val zeroStep = 0
-      iter.map { case (pId, (src: Long, path: Array[Long])) =>
+      iter.map { case (pId, (src: Int, path: Array[Int])) =>
         val neighbors = GraphMap.getNeighbors(path.head)
         if (neighbors != null && neighbors.length > 0) {
-          val (nextStep, _) = RandomSample(nextDouble).sample(neighbors)
+          val (nextStep, _) = RandomSample(nextFloat).sample(neighbors)
           (pId, (src, path ++ Array(nextStep), GraphMap.getNeighbors(src), src, zeroStep))
         } else {
           // It's a deadend.
-          (pId, (src, path, Array.empty[(Long, Double)], src, walkLength.value))
+          (pId, (src, path, Array.empty[(Int, Float)], src, walkLength.value))
         }
       }
     }, preservesPartitioning = true
     )
   }
 
-  def randomWalk(initPaths: RDD[(Int, (Long, Array[Long]))], nextDouble: () => Double = Random
-    .nextDouble)
-  : RDD[List[Long]] = {
+  def randomWalk(initPaths: RDD[(Int, (Int, Array[Int]))], nextFloat: () => Float = Random
+    .nextFloat)
+  : RDD[List[Int]] = {
     val bcP = context.broadcast(config.p)
     val bcQ = context.broadcast(config.q)
     val walkLength = context.broadcast(config.walkLength)
     val numberOfWalks = context.broadcast(config.numWalks)
-    var totalPaths: RDD[List[Long]] = context.emptyRDD[List[Long]]
+    var totalPaths: RDD[List[Int]] = context.emptyRDD[List[Int]]
 
     for (_ <- 0 until numberOfWalks.value) {
-      //      val pathsPieces: mutable.ListBuffer[RDD[(Long, (Array[Long], Int))]] = ListBuffer
+      //      val pathsPieces: mutable.ListBuffer[RDD[(Int, (Array[Int], Int))]] = ListBuffer
       // .empty
-      var pathsPieces: RDD[(Long, (Array[Long], Int))] = context.emptyRDD[(Long, (Array[Long],
+      var pathsPieces: RDD[(Int, (Array[Int], Int))] = context.emptyRDD[(Int, (Array[Int],
         Int))].partitionBy(partitioner)
-      var unfinishedWalkers: RDD[(Int, (Long, Array[Long], Array[(Long, Double)], Long, Int)
-        )] = doFirsStepOfRandomWalk(initPaths, nextDouble)
-      var prevUnfinished: RDD[(Int, (Long, Array[Long], Array[(Long, Double)], Long, Int))] =
+      var unfinishedWalkers: RDD[(Int, (Int, Array[Int], Array[(Int, Float)], Int, Int)
+        )] = doFirsStepOfRandomWalk(initPaths, nextFloat)
+      var prevUnfinished: RDD[(Int, (Int, Array[Int], Array[(Int, Float)], Int, Int))] =
         context
-          .emptyRDD[(Int, (Long, Array[Long], Array[(Long, Double)], Long, Int))]
-      var prevPieces = context.emptyRDD[(Long, (Array[Long], Int))]
-      var remainingWalkers = Long.MaxValue
+          .emptyRDD[(Int, (Int, Array[Int], Array[(Int, Float)], Int, Int))]
+      var prevPieces = context.emptyRDD[(Int, (Array[Int], Int))]
+      var remainingWalkers = Int.MaxValue
 
       val acc = context.longAccumulator("Error finder")
       val acc2 = context.longAccumulator("Error finder")
@@ -275,7 +273,7 @@ case class RandomWalk(context: SparkContext,
         unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
           prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers, walkLength)))
         val oldCount = remainingWalkers
-        remainingWalkers = unfinishedWalkers.count()
+        remainingWalkers = unfinishedWalkers.count().toInt
         prevUnfinished.unpersist(blocking = false)
         if (remainingWalkers > oldCount) {
           logger.warn(s"Inconsistent state: number of unfinished walkers was increased!")
@@ -290,11 +288,11 @@ case class RandomWalk(context: SparkContext,
         }
 
         unfinishedWalkers = unfinishedWalkers.mapPartitions({ iter =>
-          iter.map { case (pId, (src: Long, steps: Array[Long], prevNeighbors: Array[(Long,
-            Double)], origin: Long, numSteps: Int)) =>
+          iter.map { case (pId, (src: Int, steps: Array[Int], prevNeighbors: Array[(Int,
+            Float)], origin: Int, numSteps: Int)) =>
             var path = steps
             var stepCounter = numSteps
-            val rSample = RandomSample(nextDouble)
+            val rSample = RandomSample(nextFloat)
             var pNeighbors = prevNeighbors
             breakable {
               while (stepCounter < walkLength.value) {
@@ -307,8 +305,8 @@ case class RandomWalk(context: SparkContext,
                 if (currNeighbors != null) {
                   if (currNeighbors.length > 0) {
                     stepCounter += 1
-                    val (nextStep, _) = rSample.secondOrderSample(bcP.value, bcQ
-                      .value, prev, pNeighbors, currNeighbors)
+                    val (nextStep, _) = rSample.secondOrderSample(bcP.value.toInt, bcQ.value
+                      .toInt, prev, pNeighbors, currNeighbors)
                     path = path ++ Array(nextStep)
                   } else {
                     stepCounter = walkLength.value
@@ -351,7 +349,7 @@ case class RandomWalk(context: SparkContext,
     totalPaths
   }
 
-  def sortPathPieces(pathsPieces: RDD[(Long, (Array[Long], Int))]) = {
+  def sortPathPieces(pathsPieces: RDD[(Int, (Array[Int], Int))]) = {
     pathsPieces.groupByKey(config.rddPartitions).mapPartitions({
       iter =>
         iter.map {
@@ -362,21 +360,21 @@ case class RandomWalk(context: SparkContext,
   }
 
 
-  def transferWalkersToTheirPartitions(routingTable: RDD[Int], walkers: RDD[(Int, (Long,
-    Array[Long], Array[(Long, Double)], Long, Int))]) = {
+  def transferWalkersToTheirPartitions(routingTable: RDD[Int], walkers: RDD[(Int, (Int,
+    Array[Int], Array[(Int, Float)], Int, Int))]) = {
     routingTable.zipPartitions(walkers.partitionBy(partitioner)) {
       (_, iter2) =>
         iter2
     }
   }
 
-  def filterUnfinishedWalkers(walkers: RDD[(Int, (Long, Array[Long], Array[(Long, Double)],
-    Long, Int))], walkLength: Broadcast[Int]) = {
+  def filterUnfinishedWalkers(walkers: RDD[(Int, (Int, Array[Int], Array[(Int, Float)],
+    Int, Int))], walkLength: Broadcast[Int]) = {
     walkers.filter(_._2._5 < walkLength.value)
   }
 
-  def prepareWalkersToTransfer(walkers: RDD[(Int, (Long, Array[Long], Array[(Long, Double)],
-    Long, Int))]) = {
+  def prepareWalkersToTransfer(walkers: RDD[(Int, (Int, Array[Int], Array[(Int, Float)],
+    Int, Int))]) = {
     walkers.mapPartitions({
       iter =>
         iter.map {
@@ -394,8 +392,8 @@ case class RandomWalk(context: SparkContext,
 
   }
 
-  def mergeNewPaths(paths: RDD[(Long, (Array[Long], Int))], newPaths: RDD[(Long, (Array[Long],
-    Array[(Long, Double)], Long, Int))], walkLength: Broadcast[Int]) = {
+  def mergeNewPaths(paths: RDD[(Int, (Array[Int], Int))], newPaths: RDD[(Int, (Array[Int],
+    Array[(Int, Float)], Int, Int))], walkLength: Broadcast[Int]) = {
     paths.union(newPaths.mapPartitions({
       iter =>
         iter.map {
@@ -410,7 +408,7 @@ case class RandomWalk(context: SparkContext,
     }, preservesPartitioning = false))
   }
 
-  def save(paths: RDD[List[Long]]) = {
+  def save(paths: RDD[List[Int]]) = {
 
     paths.map {
       case (path) =>

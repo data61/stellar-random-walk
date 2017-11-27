@@ -1,5 +1,4 @@
-package au.csiro.data61.randomwalk.efficient
-
+package au.csiro.data61.randomwalk.efficient.vertexcut
 
 import org.apache.spark.graphx.Edge
 
@@ -20,6 +19,7 @@ object GraphMap {
   private lazy val edges: ArrayBuffer[(Int, Float)] = new ArrayBuffer()
   private var indexCounter: Int = 0
   private var offsetCounter: Int = 0
+
 
   def addVertex(vId: Int, neighbors: Array[Edge[Float]]) = synchronized {
     srcVertexMap.put(vId, indexCounter)
@@ -82,6 +82,7 @@ object GraphMap {
     offsets.clear()
     lengths.clear()
     edges.clear()
+    vertexPartitionMap.clear()
   }
 
   def getNeighbors(vid: Int): Array[(Int, Float)] = {

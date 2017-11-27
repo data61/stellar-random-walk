@@ -1,4 +1,4 @@
-package au.csiro.data61.randomwalk.efficient
+package au.csiro.data61.randomwalk.efficient.random
 
 import scala.util.Random
 

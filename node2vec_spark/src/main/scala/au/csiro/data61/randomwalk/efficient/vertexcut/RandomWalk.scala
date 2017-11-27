@@ -1,4 +1,4 @@
-package au.csiro.data61.randomwalk.efficient
+package au.csiro.data61.randomwalk.efficient.vertexcut
 
 import au.csiro.data61.Main
 import com.navercorp.common.Property
@@ -24,12 +24,13 @@ case class RandomWalk(context: SparkContext,
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
     val bcRddPartitions = context.broadcast(config.rddPartitions)
+    val bcPartitioned = context.broadcast(config.partitioned)
 
     val edgePartitions: RDD[(Int, (Array[(Int, Int, Float)], Int))] = context.textFile(config
       .input, minPartitions = config.rddPartitions).flatMap { triplet =>
       val parts = triplet.split("\\s+")
 
-      val pId: Int = parts.length > 2 match {
+      val pId: Int = bcPartitioned.value && parts.length > 2 match {
         case true => Try(parts(2).toInt).getOrElse(Random.nextInt(bcRddPartitions.value))
         case false => Random.nextInt(bcRddPartitions.value)
       }
@@ -100,6 +101,7 @@ case class RandomWalk(context: SparkContext,
   }
 
   def buildRoutingTable(graph: RDD[(Int, (Int, Array[(Int, Int, Float)]))]): RDD[Int] = {
+
     graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, (Int, Array[(Int, Int,
       Float)]))]) =>
       iter.foreach { case (_, (vId, neighbors)) =>
@@ -109,101 +111,8 @@ case class RandomWalk(context: SparkContext,
       Iterator.empty
     }, preservesPartitioning = true
     )
+
   }
-
-  //  def initRandomWalk(g: RDD[(Int, (Int, Array[(Int, Float)]))]) = {
-  //    routingTable = buildRoutingTable(g).persist(StorageLevel.MEMORY_ONLY)
-  //    routingTable.count()
-  //
-  //    val vAccum = context.longAccumulator("vertices")
-  //    val eAccum = context.longAccumulator("edges")
-  //
-  //    g.foreachPartition { iter =>
-  //      iter.foreach {
-  //        case (vId: Int, (_, neighbors: Array[(Int, Float)])) =>
-  //          vAccum.add(1)
-  //          eAccum.add(neighbors.length)
-  //      }
-  //    }
-  //    nVertices = vAccum.sum
-  //    nEdges = eAccum.sum
-  //
-  //    logger.info(s"edges: $nEdges")
-  //    logger.info(s"vertices: $nVertices")
-  //    println(s"edges: $nEdges")
-  //    println(s"vertices: $nVertices")
-  //
-  //    g.mapPartitions({ iter =>
-  //      iter.map {
-  //        case (vId: Int, _) =>
-  //          (vId, Array(vId))
-  //      }
-  //    }, preservesPartitioning = true
-  //    )
-  //  }
-
-  //  /**
-  //    * Loads the graph and computes the probabilities to go from each vertex to its neighbors
-  //    *
-  //    * @return
-  //    */
-  //  def loadGraph(): RDD[(Int, Array[Int])] = {
-  //    // the directed and weighted parameters are only used for building the graph object.
-  //    // is directed? they will be shared among stages and executors
-  //    val bcDirected = context.broadcast(config.directed)
-  //    val bcWeighted = context.broadcast(config.weighted) // is weighted?
-  //
-  //    val g: RDD[(Int, Array[(Int, Float)])] = context.textFile(config.input, minPartitions
-  //      = config
-  //      .rddPartitions).flatMap { triplet =>
-  //      val parts = triplet.split("\\s+")
-  //      // if the weights are not specified it sets it to 1.0
-  //
-  //      val weight = bcWeighted.value && parts.length > 2 match {
-  //        case true => Try(parts.last.toFloat).getOrElse(1.0)
-  //        case false => 1.0
-  //      }
-  //
-  //      val (src, dst) = (parts.head.toInt, parts(1).toInt)
-  //      if (bcDirected.value) {
-  //        Array((src, Array((dst, weight))), (dst, Array.empty[(Int, Float)]))
-  //      } else {
-  //        Array((src, Array((dst, weight))), (dst, Array((src, weight))))
-  //      }
-  //    }.
-  //      reduceByKey(_ ++ _).
-  //      partitionBy(partitioner).
-  //      persist(StorageLevel.MEMORY_AND_DISK) // TODO: Apply a smart graph partition strategy
-  //
-  //    routingTable = buildRoutingTable(g).persist(StorageLevel.MEMORY_ONLY)
-  //    routingTable.count()
-  //
-  //    val vAccum = context.longAccumulator("vertices")
-  //    val eAccum = context.longAccumulator("edges")
-  //
-  //    g.foreachPartition { iter =>
-  //      iter.foreach {
-  //        case (vId: Int, (neighbors: Array[(Int, Float)])) =>
-  //          vAccum.add(1)
-  //          eAccum.add(neighbors.length)
-  //      }
-  //    }
-  //    nVertices = vAccum.sum
-  //    nEdges = eAccum.sum
-  //
-  //    logger.info(s"edges: $nEdges")
-  //    logger.info(s"vertices: $nVertices")
-  //    println(s"edges: $nEdges")
-  //    println(s"vertices: $nVertices")
-  //
-  //    g.mapPartitions({ iter =>
-  //      iter.map {
-  //        case (vId: Int, _) =>
-  //          (vId, Array(vId))
-  //      }
-  //    }, preservesPartitioning = true
-  //    )
-  //  }
 
   def doFirsStepOfRandomWalk(paths: RDD[(Int, (Int, Array[Int]))], nextFloat: () =>
     Float = Random.nextFloat): RDD[(Int, (Int, Array[Int], Array[(Int, Float)], Int,

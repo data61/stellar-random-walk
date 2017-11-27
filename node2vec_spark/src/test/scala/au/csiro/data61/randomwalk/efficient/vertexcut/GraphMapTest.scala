@@ -1,4 +1,4 @@
-package au.csiro.data61.randomwalk.efficient
+package au.csiro.data61.randomwalk.efficient.vertexcut
 
 import org.apache.spark.graphx.Edge
 import org.scalatest.FunSuite

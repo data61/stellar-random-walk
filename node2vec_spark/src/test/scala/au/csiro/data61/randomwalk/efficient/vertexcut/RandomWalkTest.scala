@@ -1,4 +1,4 @@
-package au.csiro.data61.randomwalk.efficient
+package au.csiro.data61.randomwalk.efficient.vertexcut
 
 import au.csiro.data61.Main.Params
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}

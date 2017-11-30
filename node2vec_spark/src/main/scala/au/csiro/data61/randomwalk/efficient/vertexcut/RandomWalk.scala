@@ -69,13 +69,15 @@ case class RandomWalk(context: SparkContext,
     val vAccum = context.longAccumulator("vertices")
     val eAccum = context.longAccumulator("edges")
 
-    val rAcc = context.longAccumulator("replicas")
-    val lAcc = context.longAccumulator("links")
+    val rAcc = context.collectionAccumulator[Int]("replicas")
+    val lAcc = context.collectionAccumulator[Int]("links")
 
     vertexNeighbors.foreachPartition { iter =>
       val (r, e) = GraphMap.getGraphStatsOnlyOnce
-      rAcc.add(r)
-      lAcc.add(e)
+      if (r != 0) {
+        rAcc.add(r)
+        lAcc.add(e)
+      }
       iter.foreach {
         case (_, (neighbors: Array[(Int, Int, Float)], _)) =>
           vAccum.add(1)
@@ -90,10 +92,20 @@ case class RandomWalk(context: SparkContext,
     println(s"edges: $nEdges")
     println(s"vertices: $nVertices")
 
-    logger.info(s"E Replicas: ${lAcc.sum}")
-    logger.info(s"V Replicas: ${rAcc.sum}")
-    println(s"E Replicas: ${lAcc.sum}")
-    println(s"V Replicas: ${rAcc.sum}")
+    val ePartitions = lAcc.value.toArray.mkString(" ")
+    val vPartitions = rAcc.value.toArray.mkString(" ")
+    logger.info(s"E Partitions: $ePartitions")
+    logger.info(s"V Partitions: $vPartitions")
+    println(s"E Partitions: $ePartitions")
+    println(s"V Partitions: $vPartitions")
+
+//    var lSum = 0
+//    lAcc.value.toArray.foreach(lSum += _)
+//    val rSum = rAcc.value.toArray.sum(_)
+//    logger.info(s"E Replicas: $lSum")
+//    logger.info(s"V Replicas: $rSum")
+//    println(s"E Replicas: $lSum")
+//    println(s"V Replicas: $rSum")
 
     val walkers = vertexNeighbors.map {
       case (vId: Int, (_, pId: Int)) =>

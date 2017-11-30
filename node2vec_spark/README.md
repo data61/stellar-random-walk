@@ -1,5 +1,6 @@
 # node2vec on spark
 
+This project reuses the source code from https://github.com/aditya-grover/node2vec/tree/master/node2vec_spark. This includes the source code available in com.navercorp package. The reason is to enable selection of different implementations for running the random walk.
 This library is a implementation using scala for running on spark of *node2vec* as described in the paper:
 > node2vec: Scalable Feature Learning for Networks.
 > Aditya Grover and Jure Leskovec.

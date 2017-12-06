@@ -1,5 +1,6 @@
 package au.csiro.data61.randomwalk.efficient.random
 
+import au.csiro.data61.randomwalk.efficient.vertexcut.GraphMap.{firstGet, offsetCounter, srcVertexMap}
 import org.apache.spark.graphx.Edge
 
 import scala.collection.mutable
@@ -18,6 +19,7 @@ object GraphMap {
   private lazy val edges: ArrayBuffer[(Int, Float)] = new ArrayBuffer()
   private var indexCounter: Int = 0
   private var offsetCounter: Int = 0
+  private var firstGet: Boolean = true
 
 
   def addVertex(vId: Int, neighbors: Array[Edge[Float]]) = synchronized {
@@ -51,6 +53,19 @@ object GraphMap {
       }
       case Some(value) => value
     }
+  }
+
+  def getGraphStatsOnlyOnce: (Int, Int) = synchronized {
+    if (firstGet) {
+      firstGet = false
+      (srcVertexMap.size, offsetCounter)
+    }
+    else
+      (0,0)
+  }
+
+  def resetGetters {
+    firstGet = true
   }
 
   def addVertex(vId: Int): Unit = synchronized {

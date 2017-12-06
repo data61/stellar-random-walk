@@ -1,6 +1,7 @@
 package au.csiro.data61.randomwalk.efficient.random
 
 import au.csiro.data61.Main
+import au.csiro.data61.randomwalk.efficient.vertexcut.GraphMap
 import com.navercorp.common.Property
 import org.apache.log4j.LogManager
 import org.apache.spark.broadcast.Broadcast
@@ -59,7 +60,15 @@ case class RandomWalk(context: SparkContext,
     val vAccum = context.longAccumulator("vertices")
     val eAccum = context.longAccumulator("edges")
 
+    val rAcc = context.collectionAccumulator[Int]("replicas")
+    val lAcc = context.collectionAccumulator[Int]("links")
+
     g.foreachPartition { iter =>
+      val (r, e) = GraphMap.getGraphStatsOnlyOnce
+      if (r != 0) {
+        rAcc.add(r)
+        lAcc.add(e)
+      }
       iter.foreach {
         case (_, (neighbors: Array[(Int, Float)])) =>
           vAccum.add(1)
@@ -73,6 +82,13 @@ case class RandomWalk(context: SparkContext,
     logger.info(s"vertices: $nVertices")
     println(s"edges: $nEdges")
     println(s"vertices: $nVertices")
+
+    val ePartitions = lAcc.value.toArray.mkString(" ")
+    val vPartitions = rAcc.value.toArray.mkString(" ")
+    logger.info(s"E Partitions: $ePartitions")
+    logger.info(s"V Partitions: $vPartitions")
+    println(s"E Partitions: $ePartitions")
+    println(s"V Partitions: $vPartitions")
 
     g.mapPartitions({ iter =>
       iter.map {

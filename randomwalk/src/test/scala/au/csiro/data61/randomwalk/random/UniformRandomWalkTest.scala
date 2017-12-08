@@ -1,6 +1,7 @@
 package au.csiro.data61.randomwalk.random
 
-import au.csiro.data61.randomwalk.Main.Params
+import au.csiro.data61.randomwalk.RandomSample
+import au.csiro.data61.randomwalk.common.Params
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 import org.scalatest.BeforeAndAfter
 
@@ -26,7 +27,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     if (sc != null) {
       sc.stop()
     }
-    GraphMap.reset
+    RandomGraphMap.reset
   }
 
   test("load graph as undirected") {
@@ -39,8 +40,8 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val vAcc = sc.longAccumulator("v")
     val eAcc = sc.longAccumulator("e")
     paths.coalesce(1).mapPartitions { iter =>
-      vAcc.add(GraphMap.getNumVertices)
-      eAcc.add(GraphMap.getNumEdges)
+      vAcc.add(RandomGraphMap.getNumVertices)
+      eAcc.add(RandomGraphMap.getNumEdges)
       iter
     }.first()
     assert(eAcc.sum == 156)
@@ -57,8 +58,8 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val vAcc = sc.longAccumulator("v")
     val eAcc = sc.longAccumulator("e")
     paths.coalesce(1).mapPartitions { iter =>
-      vAcc.add(GraphMap.getNumVertices)
-      eAcc.add(GraphMap.getNumEdges)
+      vAcc.add(RandomGraphMap.getNumVertices)
+      eAcc.add(RandomGraphMap.getNumEdges)
       iter
     }.first()
     assert(eAcc.sum == 78)
@@ -276,7 +277,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val rSampler = RandomSample(nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     paths.collect().foreach { case (p: List[Int]) =>
-      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
   }
@@ -294,7 +295,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: List[Int]) =>
-      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
 
     }
@@ -313,7 +314,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: List[Int]) =>
-      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
   }
@@ -331,7 +332,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: List[Int]) =>
-      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
   }
@@ -350,7 +351,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: List[Int]) =>
-      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
   }
@@ -370,12 +371,12 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: List[Int]) =>
-      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
   }
 
-  private def doSecondOrderRandomWalk(gMap: GraphMap.type, src: Int,
+  private def doSecondOrderRandomWalk(gMap: RandomGraphMap.type, src: Int,
                                       walkLength: Int, rSampler: RandomSample, p: Float,
                                       q: Float): Array[Int]
   = {

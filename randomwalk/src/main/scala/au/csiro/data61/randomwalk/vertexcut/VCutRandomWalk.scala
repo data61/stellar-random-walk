@@ -1,8 +1,7 @@
 package au.csiro.data61.randomwalk.vertexcut
 
-import au.csiro.data61.randomwalk.common.Property
-import au.csiro.data61.randomwalk.{Main, RandomWalk}
-import org.apache.log4j.LogManager
+import au.csiro.data61.randomwalk.common.Params
+import au.csiro.data61.randomwalk.{RandomSample, RandomWalk}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -12,7 +11,7 @@ import scala.util.control.Breaks._
 import scala.util.{Random, Try}
 
 case class VCutRandomWalk(context: SparkContext,
-                          config: Main.Params) extends RandomWalk[(Int, (Int, Array[Int]))] with
+                          config: Params) extends RandomWalk[(Int, (Int, Array[Int]))] with
   Serializable {
 
   val partitioner = new HashPartitioner(config.rddPartitions)
@@ -71,7 +70,7 @@ case class VCutRandomWalk(context: SparkContext,
     val lAcc = context.collectionAccumulator[Int]("links")
 
     vertexNeighbors.foreachPartition { iter =>
-      val (r, e) = GraphMap.getGraphStatsOnlyOnce
+      val (r, e) = PartitionedGraphMap.getGraphStatsOnlyOnce
       if (r != 0) {
         rAcc.add(r)
         lAcc.add(e)
@@ -126,7 +125,7 @@ case class VCutRandomWalk(context: SparkContext,
     graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, (Int, Array[(Int, Int,
       Float)]))]) =>
       iter.foreach { case (_, (vId, neighbors)) =>
-        GraphMap.addVertex(vId, neighbors)
+        PartitionedGraphMap.addVertex(vId, neighbors)
         id
       }
       Iterator.empty
@@ -142,10 +141,10 @@ case class VCutRandomWalk(context: SparkContext,
     paths.mapPartitions({ iter =>
       val zeroStep = 0
       iter.map { case (pId, (src: Int, path: Array[Int])) =>
-        val neighbors = GraphMap.getNeighbors(path.head)
+        val neighbors = PartitionedGraphMap.getNeighbors(path.head)
         if (neighbors != null && neighbors.length > 0) {
           val (nextStep, _) = RandomSample(nextFloat).sample(neighbors)
-          (pId, (src, path ++ Array(nextStep), GraphMap.getNeighbors(src), src, zeroStep))
+          (pId, (src, path ++ Array(nextStep), PartitionedGraphMap.getNeighbors(src), src, zeroStep))
         } else {
           // It's a deadend.
           (pId, (src, path, Array.empty[(Int, Float)], src, walkLength.value))
@@ -226,10 +225,10 @@ case class VCutRandomWalk(context: SparkContext,
             breakable {
               while (stepCounter < walkLength.value) {
                 val curr = path.last
-                val currNeighbors = GraphMap.getNeighbors(curr)
+                val currNeighbors = PartitionedGraphMap.getNeighbors(curr)
                 val prev = path(path.length - 2)
                 if (path.length > 2) { // If the walker is continuing on the local partition.
-                  pNeighbors = GraphMap.getNeighbors(prev)
+                  pNeighbors = PartitionedGraphMap.getNeighbors(prev)
                 }
                 if (currNeighbors != null) {
                   if (currNeighbors.length > 0) {
@@ -310,7 +309,7 @@ case class VCutRandomWalk(context: SparkContext,
           case (_, (_, steps,
           prevNeighbors, origin,
           stepCounter)) =>
-            val pId = GraphMap.getPartition(steps.last) match {
+            val pId = PartitionedGraphMap.getPartition(steps.last) match {
               case Some(pId) => pId
               case None => -1 // Must exists!
             }

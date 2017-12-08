@@ -1,4 +1,4 @@
-package au.csiro.data61.randomwalk.vertexcut
+package au.csiro.data61.randomwalk
 
 import scala.util.Random
 

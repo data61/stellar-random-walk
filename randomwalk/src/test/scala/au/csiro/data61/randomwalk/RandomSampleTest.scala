@@ -1,4 +1,4 @@
-package au.csiro.data61.randomwalk.random
+package au.csiro.data61.randomwalk
 
 import org.apache.spark.graphx.Edge
 import org.scalatest.FunSuite

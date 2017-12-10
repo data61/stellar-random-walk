@@ -10,12 +10,8 @@ import org.apache.spark.{HashPartitioner, SparkContext}
 import scala.util.control.Breaks._
 import scala.util.{Random, Try}
 
-case class UniformRandomWalk(context: SparkContext,
-                             config: Params) extends RandomWalk[(Int, Array[Int])] with
-  Serializable {
-
-  val partitioner = new HashPartitioner(config.rddPartitions)
-  var routingTable = context.emptyRDD[Int]
+case class UniformRandomWalk(context: SparkContext, config: Params) extends RandomWalk[(Int,
+  Array[Int])] with Serializable {
 
   /**
     * Loads the graph and computes the probabilities to go from each vertex to its neighbors

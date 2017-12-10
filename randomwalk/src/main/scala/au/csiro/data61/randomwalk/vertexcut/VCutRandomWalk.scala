@@ -14,9 +14,6 @@ case class VCutRandomWalk(context: SparkContext,
                           config: Params) extends RandomWalk[(Int, (Int, Array[Int]))] with
   Serializable {
 
-  val partitioner = new HashPartitioner(config.rddPartitions)
-  var routingTable = context.emptyRDD[Int]
-
   def loadGraph(): RDD[(Int, (Int, Array[Int]))] = {
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
@@ -95,14 +92,6 @@ case class VCutRandomWalk(context: SparkContext,
     logger.info(s"V Partitions: $vPartitions")
     println(s"E Partitions: $ePartitions")
     println(s"V Partitions: $vPartitions")
-
-    //    var lSum = 0
-    //    lAcc.value.toArray.foreach(lSum += _)
-    //    val rSum = rAcc.value.toArray.sum(_)
-    //    logger.info(s"E Replicas: $lSum")
-    //    logger.info(s"V Replicas: $rSum")
-    //    println(s"E Replicas: $lSum")
-    //    println(s"V Replicas: $rSum")
 
     val walkers = vertexNeighbors.map {
       case (vId: Int, (_, pId: Int)) =>

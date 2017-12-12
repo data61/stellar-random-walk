@@ -2,19 +2,19 @@ package au.csiro.data61.randomwalk.vertexcut
 
 import au.csiro.data61.randomwalk.common.Params
 import au.csiro.data61.randomwalk.{RandomSample, RandomWalk}
+import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.{HashPartitioner, SparkContext}
 
 import scala.util.control.Breaks._
 import scala.util.{Random, Try}
 
 case class VCutRandomWalk(context: SparkContext,
-                          config: Params) extends RandomWalk[(Int, (Int, Array[Int]))] with
+                          config: Params) extends RandomWalk[(Int, Array[Int])] with
   Serializable {
 
-  def loadGraph(): RDD[(Int, (Int, Array[Int]))] = {
+  def loadGraph(): RDD[(Int, Array[Int])] = {
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
     val bcRddPartitions = context.broadcast(config.rddPartitions)
@@ -95,14 +95,14 @@ case class VCutRandomWalk(context: SparkContext,
 
     val walkers = vertexNeighbors.map {
       case (vId: Int, (_, pId: Int)) =>
-        (pId, (vId, Array(vId)))
+        (pId, Array(vId))
     }
 
     initWalkersToTheirPartitions(routingTable, walkers).persist(StorageLevel.MEMORY_AND_DISK)
   }
 
-  def initWalkersToTheirPartitions(routingTable: RDD[Int], walkers: RDD[(Int, (Int,
-    Array[Int]))]) = {
+  def initWalkersToTheirPartitions(routingTable: RDD[Int], walkers: RDD[(Int,
+    Array[Int])]) = {
     routingTable.zipPartitions(walkers.partitionBy(partitioner)) {
       (_, iter2) =>
         iter2
@@ -123,90 +123,93 @@ case class VCutRandomWalk(context: SparkContext,
 
   }
 
-  def doFirsStepOfRandomWalk(paths: RDD[(Int, (Int, Array[Int]))], nextFloat: () =>
-    Float = Random.nextFloat): RDD[(Int, (Int, Array[Int], Array[(Int, Float)], Int,
-    Int))] = {
+  def doFirsStepOfRandomWalk(paths: RDD[(Int, Array[Int])], nextFloat: () =>
+    Float = Random.nextFloat): RDD[(Int, (Array[Int], Array[(Int, Float)], Int))] = {
     val walkLength = context.broadcast(config.walkLength)
     paths.mapPartitions({ iter =>
       val zeroStep = 0
-      iter.map { case (pId, (src: Int, path: Array[Int])) =>
+      iter.map { case (pId, path: Array[Int]) =>
         val neighbors = PartitionedGraphMap.getNeighbors(path.head)
         if (neighbors != null && neighbors.length > 0) {
           val (nextStep, _) = RandomSample(nextFloat).sample(neighbors)
-          (pId, (src, path ++ Array(nextStep), PartitionedGraphMap.getNeighbors(src), src, zeroStep))
+          (pId, (path ++ Array(nextStep), PartitionedGraphMap.getNeighbors(path.head), zeroStep))
         } else {
           // It's a deadend.
-          (pId, (src, path, Array.empty[(Int, Float)], src, walkLength.value))
+          (pId, (path, Array.empty[(Int, Float)], walkLength.value))
         }
       }
     }, preservesPartitioning = true
     )
   }
 
-  override def randomWalk(initPaths: RDD[(Int, (Int, Array[Int]))], nextFloat: () => Float = Random
-    .nextFloat): RDD[List[Int]] = {
+  override def randomWalk(initPaths: RDD[(Int, Array[Int])], nextFloat: () => Float = Random
+    .nextFloat): RDD[Array[Int]] = {
     val bcP = context.broadcast(config.p)
     val bcQ = context.broadcast(config.q)
     val walkLength = context.broadcast(config.walkLength)
     val numberOfWalks = context.broadcast(config.numWalks)
-    var totalPaths: RDD[List[Int]] = context.emptyRDD[List[Int]]
+    var totalPaths: RDD[Array[Int]] = context.emptyRDD[Array[Int]]
 
     for (_ <- 0 until numberOfWalks.value) {
       //      val pathsPieces: mutable.ListBuffer[RDD[(Int, (Array[Int], Int))]] = ListBuffer
       // .empty
-      var pathsPieces: RDD[(Int, (Array[Int], Int))] = context.emptyRDD[(Int, (Array[Int],
-        Int))].partitionBy(partitioner)
-      var unfinishedWalkers: RDD[(Int, (Int, Array[Int], Array[(Int, Float)], Int, Int)
-        )] = doFirsStepOfRandomWalk(initPaths, nextFloat)
-      var prevUnfinished: RDD[(Int, (Int, Array[Int], Array[(Int, Float)], Int, Int))] =
-        context
-          .emptyRDD[(Int, (Int, Array[Int], Array[(Int, Float)], Int, Int))]
-      var prevPieces = context.emptyRDD[(Int, (Array[Int], Int))]
+      //      var pathsPieces: RDD[(Int, (Array[Int], Int))] = context.emptyRDD[(Int, (Array[Int],
+      //        Int))].partitionBy(partitioner)
+      var unfinishedWalkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Int))] =
+      doFirsStepOfRandomWalk(initPaths, nextFloat)
+      //      var prevUnfinished: RDD[(Int, (Int, Array[Int], Array[(Int, Float)], Int, Int))] =
+      //        context
+      //          .emptyRDD[(Int, (Int, Array[Int], Array[(Int, Float)], Int, Int))]
+      //      var prevPieces = context.emptyRDD[(Int, (Array[Int], Int))]
       var remainingWalkers = Int.MaxValue
 
       val acc = context.longAccumulator("Error finder")
       val acc2 = context.longAccumulator("Error finder")
       do {
-        val pieces = unfinishedWalkers.mapPartitions({ iter =>
-          iter.map {
-            case (_, (_, steps,
-            _, origin,
-            stepCounter)) =>
-              if (stepCounter == walkLength.value)
-                (origin, (steps, stepCounter))
-              else
-                (origin, (steps.slice(0, steps.length - 2), stepCounter))
-          }
-        }, preservesPartitioning = false)
+        //        val pieces = unfinishedWalkers.mapPartitions({ iter =>
+        //          iter.map {
+        //            case (_, (_, steps,
+        //            _, origin,
+        //            stepCounter)) =>
+        //              if (stepCounter == walkLength.value)
+        //                (origin, (steps, stepCounter))
+        //              else
+        //                (origin, (steps.slice(0, steps.length - 2), stepCounter))
+        //          }
+        //        }, preservesPartitioning = false)
 
         //        pieces.count()
         //        pathsPieces.append(pieces)
 
-        prevPieces = pathsPieces
-        pathsPieces = context.union(pathsPieces, pieces).persist(StorageLevel.MEMORY_AND_DISK)
-        pathsPieces.count()
-        prevPieces.unpersist(blocking = false)
-        prevUnfinished = unfinishedWalkers
+        //        prevPieces = pathsPieces
+        //        pathsPieces = context.union(pathsPieces, pieces).persist(StorageLevel
+        // .MEMORY_AND_DISK)
+        //        pathsPieces.count()
+        //        prevPieces.unpersist(blocking = false)
+        //        prevUnfinished = unfinishedWalkers
+        //        unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
+        //          prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers,
+        // walkLength)))
         unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
-          prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers, walkLength)))
-        val oldCount = remainingWalkers
-        remainingWalkers = unfinishedWalkers.count().toInt
-        prevUnfinished.unpersist(blocking = false)
-        if (remainingWalkers > oldCount) {
-          logger.warn(s"Inconsistent state: number of unfinished walkers was increased!")
-          println(s"Inconsistent state: number of unfinished walkers was increased!")
-        }
-        println(s"Unfinished Walkers: $remainingWalkers")
-        if (!acc.isZero || !acc2.isZero) {
-          println(s"Wrong Transports: ${acc.sum}")
-          println(s"Zero Neighbors: ${acc2.sum}")
-          acc.reset()
-          acc2.reset()
-        }
+          prepareWalkersToTransfer(unfinishedWalkers))
+        //        val oldCount = remainingWalkers
+        //        remainingWalkers = unfinishedWalkers.count().toInt
+        //        prevUnfinished.unpersist(blocking = false)
+        //        if (remainingWalkers > oldCount) {
+        //          logger.warn(s"Inconsistent state: number of unfinished walkers was increased!")
+        //          println(s"Inconsistent state: number of unfinished walkers was increased!")
+        //        }
+        //        println(s"Unfinished Walkers: $remainingWalkers")
+        //        if (!acc.isZero || !acc2.isZero) {
+        //          println(s"Wrong Transports: ${acc.sum}")
+        //          println(s"Zero Neighbors: ${acc2.sum}")
+        //          acc.reset()
+        //          acc2.reset()
+        //        }
 
         unfinishedWalkers = unfinishedWalkers.mapPartitions({ iter =>
-          iter.map { case (pId, (src: Int, steps: Array[Int], prevNeighbors: Array[(Int,
-            Float)], origin: Int, numSteps: Int)) =>
+          iter.map { case (pId, (steps: Array[Int], prevNeighbors: Array[(Int,
+            Float)], numSteps: Int)) =>
             var path = steps
             var stepCounter = numSteps
             val rSample = RandomSample(nextFloat)
@@ -243,11 +246,26 @@ case class VCutRandomWalk(context: SparkContext,
               }
             }
 
-            (pId, (src, path, pNeighbors, origin, stepCounter))
+            (pId, (path, pNeighbors, stepCounter))
           }
         }
           , preservesPartitioning = true
         ).persist(StorageLevel.MEMORY_AND_DISK)
+
+        val oldCount = remainingWalkers
+        remainingWalkers = filterUnfinishedWalkers(unfinishedWalkers, walkLength).count().toInt
+
+        if (remainingWalkers > oldCount) {
+          logger.warn(s"Inconsistent state: number of unfinished walkers was increased!")
+          println(s"Inconsistent state: number of unfinished walkers was increased!")
+        }
+        println(s"Unfinished Walkers: $remainingWalkers")
+        if (!acc.isZero || !acc2.isZero) {
+          println(s"Wrong Transports: ${acc.sum}")
+          println(s"Zero Neighbors: ${acc2.sum}")
+          acc.reset()
+          acc2.reset()
+        }
       }
       while (remainingWalkers != 0)
 
@@ -255,7 +273,15 @@ case class VCutRandomWalk(context: SparkContext,
       //      println(s"Total created path pieces: ${allPieces.count()}")
       //      pathsPieces.foreach(piece => piece.unpersist(blocking = false))
 
-      totalPaths = totalPaths.union(sortPathPieces(pathsPieces)).persist(StorageLevel
+      val paths = unfinishedWalkers.filter(_._2._3 == walkLength.value).map { case (_, (paths, _,
+      _)) =>
+        paths
+      }.cache()
+      val nPaths = paths.count()
+      if (nPaths != nVertices) {
+        println(s"Inconsistent number of paths: ${nPaths}")
+      }
+      totalPaths = totalPaths.union(paths).persist(StorageLevel
         .MEMORY_AND_DISK)
       //      totalPaths = totalPaths.union(sortPathPieces(context.union(pathsPieces)))
       //        .persist(StorageLevel.MEMORY_AND_DISK)
@@ -277,33 +303,29 @@ case class VCutRandomWalk(context: SparkContext,
   }
 
 
-  def transferWalkersToTheirPartitions(routingTable: RDD[Int], walkers: RDD[(Int, (Int,
-    Array[Int], Array[(Int, Float)], Int, Int))]) = {
+  def transferWalkersToTheirPartitions(routingTable: RDD[Int], walkers: RDD[(Int, (
+    Array[Int], Array[(Int, Float)], Int))]) = {
     routingTable.zipPartitions(walkers.partitionBy(partitioner)) {
       (_, iter2) =>
         iter2
     }
   }
 
-  def filterUnfinishedWalkers(walkers: RDD[(Int, (Int, Array[Int], Array[(Int, Float)],
-    Int, Int))], walkLength: Broadcast[Int]) = {
-    walkers.filter(_._2._5 < walkLength.value)
+  def filterUnfinishedWalkers(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)],
+    Int))], walkLength: Broadcast[Int]) = {
+    walkers.filter(_._2._3 < walkLength.value)
   }
 
-  def prepareWalkersToTransfer(walkers: RDD[(Int, (Int, Array[Int], Array[(Int, Float)],
-    Int, Int))]) = {
+  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Int))]) = {
     walkers.mapPartitions({
       iter =>
         iter.map {
-          case (_, (_, steps,
-          prevNeighbors, origin,
-          stepCounter)) =>
+          case (_, (steps, prevNeighbors, stepCounter)) =>
             val pId = PartitionedGraphMap.getPartition(steps.last) match {
               case Some(pId) => pId
               case None => -1 // Must exists!
             }
-            (pId, (steps.last, steps.slice(steps.length - 2, steps.length), prevNeighbors, origin,
-              stepCounter))
+            (pId, (steps, prevNeighbors, stepCounter))
         }
     }, preservesPartitioning = false)
 

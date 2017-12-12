@@ -52,7 +52,7 @@ object Main {
     }.saveAsTextFile(s"${config.output}.${Property.vectorSuffix}")
   }
 
-  def doRandomWalk(context: SparkContext, param: Params): RDD[List[Int]] = {
+  def doRandomWalk(context: SparkContext, param: Params): RDD[Array[Int]] = {
     val rw = param.partitioned match {
       case true => VCutRandomWalk(context, param)
       case false => UniformRandomWalk(context, param)
@@ -62,9 +62,9 @@ object Main {
     paths
   }
 
-  def convertPathsToIterables(paths: RDD[List[Int]]) = {
+  def convertPathsToIterables(paths: RDD[Array[Int]]) = {
     paths.map { p =>
-      p.map(_.toString)
+      p.map(_.toString).toList
     }
   }
 

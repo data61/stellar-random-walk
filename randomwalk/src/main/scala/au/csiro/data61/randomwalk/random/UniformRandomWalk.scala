@@ -126,12 +126,12 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
 
   def randomWalk(initPaths: RDD[(Int, Array[Int])], nextFloat: () => Float = Random
     .nextFloat)
-  : RDD[List[Int]] = {
+  : RDD[Array[Int]] = {
     val bcP = context.broadcast(config.p)
     val bcQ = context.broadcast(config.q)
     val walkLength = context.broadcast(config.walkLength)
     val numberOfWalks = context.broadcast(config.numWalks)
-    var totalPaths: RDD[List[Int]] = context.emptyRDD[List[Int]]
+    var totalPaths: RDD[Array[Int]] = context.emptyRDD[Array[Int]]
 
     for (_ <- 0 until numberOfWalks.value) {
       //      val pathsPieces: mutable.ListBuffer[RDD[(Int, (Array[Int], Int))]] = ListBuffer
@@ -237,8 +237,8 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
       //      println(s"Total created path pieces: ${allPieces.count()}")
       //      pathsPieces.foreach(piece => piece.unpersist(blocking = false))
 
-      totalPaths = totalPaths.union(sortPathPieces(pathsPieces)).persist(StorageLevel
-        .MEMORY_AND_DISK)
+//      totalPaths = totalPaths.union(sortPathPieces(pathsPieces)).persist(StorageLevel
+//        .MEMORY_AND_DISK)
       //      totalPaths = totalPaths.union(sortPathPieces(context.union(pathsPieces)))
       //        .persist(StorageLevel.MEMORY_AND_DISK)
       totalPaths.count()

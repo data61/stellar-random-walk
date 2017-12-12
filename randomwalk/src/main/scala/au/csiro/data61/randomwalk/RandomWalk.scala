@@ -18,11 +18,11 @@ trait RandomWalk[T] {
   var nVertices: Int = 0
   var nEdges: Int = 0
 
-  def execute(): RDD[List[Int]] = {
+  def execute(): RDD[Array[Int]] = {
     randomWalk(loadGraph())
   }
 
-  def save(paths: RDD[List[Int]], partitions: Int, output: String) = {
+  def save(paths: RDD[Array[Int]], partitions: Int, output: String) = {
 
     paths.map {
       case (path) =>
@@ -33,5 +33,5 @@ trait RandomWalk[T] {
 
   def loadGraph(): RDD[T]
 
-  def randomWalk(g: RDD[T], nextFloat: () => Float = Random.nextFloat): RDD[List[Int]]
+  def randomWalk(g: RDD[T], nextFloat: () => Float = Random.nextFloat): RDD[Array[Int]]
 }

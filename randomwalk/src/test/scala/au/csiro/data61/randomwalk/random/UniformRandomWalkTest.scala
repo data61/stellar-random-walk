@@ -276,7 +276,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val paths = rw.randomWalk(graph, nextFloatGen)
     val rSampler = RandomSample(nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
-    paths.collect().foreach { case (p: List[Int]) =>
+    paths.collect().foreach { case (p: Array[Int]) =>
       val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
@@ -294,7 +294,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val paths = rw.randomWalk(graph, nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
-    paths.collect().foreach { case (p: List[Int]) =>
+    paths.collect().foreach { case (p: Array[Int]) =>
       val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
 
@@ -313,7 +313,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val paths = rw.randomWalk(graph, nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
-    paths.collect().foreach { case (p: List[Int]) =>
+    paths.collect().foreach { case (p: Array[Int]) =>
       val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
@@ -331,7 +331,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val paths = rw.randomWalk(graph, nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
-    paths.collect().foreach { case (p: List[Int]) =>
+    paths.collect().foreach { case (p: Array[Int]) =>
       val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
@@ -350,7 +350,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val paths = rw.randomWalk(graph, nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
-    paths.collect().foreach { case (p: List[Int]) =>
+    paths.collect().foreach { case (p: Array[Int]) =>
       val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
@@ -370,7 +370,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val paths = rw.randomWalk(graph, nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
-    paths.collect().foreach { case (p: List[Int]) =>
+    paths.collect().foreach { case (p: Array[Int]) =>
       val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }

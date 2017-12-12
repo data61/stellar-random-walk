@@ -3,6 +3,7 @@ package au.csiro.data61.randomwalk.random
 import au.csiro.data61.randomwalk.common.Params
 import au.csiro.data61.randomwalk.{RandomSample, RandomWalk}
 import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
@@ -205,6 +206,11 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     }, preservesPartitioning = true
     )
 
+  }
+
+  def filterUnfinishedWalkers(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Int))],
+                              walkLength: Broadcast[Int]) = {
+    walkers.filter(_._2._3 < walkLength.value)
   }
 
   def initFirstStep(paths: RDD[(Int, Array[Int])], nextFloat: () =>

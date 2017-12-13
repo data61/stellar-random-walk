@@ -118,9 +118,9 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val graph = sc.parallelize(Array(v1, v2, v3)).partitionBy(partitioner)
     val rTable = rw.buildRoutingTable(graph)
 
-    val w1 = (1, (Array.empty[Int], Array.empty[(Int, Float)], 1))
-    val w2 = (2, (Array.empty[Int], Array.empty[(Int, Float)], 2))
-    val w3 = (3, (Array.empty[Int], Array.empty[(Int, Float)], 3))
+    val w1 = (1, (Array.empty[Int], Array.empty[(Int, Float)], false))
+    val w2 = (2, (Array.empty[Int], Array.empty[(Int, Float)], false))
+    val w3 = (3, (Array.empty[Int], Array.empty[(Int, Float)], false))
 
     val walkers = sc.parallelize(Array(w3, w1, w2)).partitionBy(partitioner)
     val tWalkers = rw.transferWalkersToTheirPartitions(rTable, walkers)
@@ -140,12 +140,10 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
 
     val p1 = Array(1, 2, 3, 4)
     val op1 = 1
-    val wl1 = 5
-    val w1 = (op1, (p1, Array.empty[(Int, Float)], wl1))
+    val w1 = (op1, (p1, Array.empty[(Int, Float)], false))
     val p2 = Array(2, 5)
     val op2 = 2
-    val wl2 = 2
-    val w2 = (op2, (p2, Array.empty[(Int, Float)], wl2))
+    val w2 = (op2, (p2, Array.empty[(Int, Float)], false))
 
     val walkers = sc.parallelize(Array(w1, w2))
 
@@ -155,22 +153,22 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     assert(preparedWalkers.length == 2)
     val l1 = preparedWalkers.filter(_._2._1.head == p1.head)(0)._2
 
-    assert((l1._1 sameElements p1) && (l1._3 == wl1))
+    assert((l1._1 sameElements p1))
     //
     val l2 = preparedWalkers.filter(_._2._1.head == p2.head)(0)._2
-    assert((l2._1 sameElements p2) && (l2._3 == wl2))
+    assert((l2._1 sameElements p2))
   }
 
   test("filterUnfinishedWalkers") {
     val walkLength = sc.broadcast(4)
-    val p1 = (1, (Array.empty[Int], Array.empty[(Int, Float)], walkLength.value))
-    val p2 = (2, (Array.empty[Int], Array.empty[(Int, Float)], walkLength.value - 2))
-    val p3 = (3, (Array.empty[Int], Array.empty[(Int, Float)], walkLength.value - 1))
+    val p1 = (1, (Array.empty[Int], Array.empty[(Int, Float)], true))
+    val p2 = (2, (Array.empty[Int], Array.empty[(Int, Float)], false))
+    val p3 = (3, (Array.empty[Int], Array.empty[(Int, Float)], false))
     val walkers = sc.parallelize(Array(p1, p2, p3))
 
     val rw = UniformRandomWalk(sc, Params())
 
-    val filteredWalkers = rw.filterUnfinishedWalkers(walkers, walkLength).collect()
+    val filteredWalkers = rw.filterUnfinishedWalkers(walkers).collect()
 
     assert(filteredWalkers.size == 2)
     assert(filteredWalkers.filter(_._1 == p2._1).length == 1)

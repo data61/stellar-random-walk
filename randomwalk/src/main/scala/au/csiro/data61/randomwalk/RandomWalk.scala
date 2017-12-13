@@ -25,12 +25,12 @@ trait RandomWalk extends Serializable {
   def loadGraph(): RDD[(Int, Array[Int])]
 
   def initFirstStep(g: RDD[(Int, Array[Int])] , nextFloat: () => Float = Random.nextFloat): RDD[(Int,
-    (Array[Int], Array[(Int, Float)], Int))]
+    (Array[Int], Array[(Int, Float)], Boolean))]
 
   def randomWalk(initPaths: RDD[(Int, Array[Int])], nextFloat: () => Float = Random.nextFloat): RDD[Array[Int]]
 
   def transferWalkersToTheirPartitions(routingTable: RDD[Int], walkers: RDD[(Int, (Array[Int],
-    Array[(Int, Float)], Int))]) = {
+    Array[(Int, Float)], Boolean))]) = {
     routingTable.zipPartitions(walkers.partitionBy(partitioner)) {
       (_, iter2) =>
         iter2
@@ -42,15 +42,15 @@ trait RandomWalk extends Serializable {
 //    walkers.filter(_._2._3 < walkLength.value)
 //  }
 
-  def filterCompletedPaths(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Int))],
+  def filterCompletedPaths(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))],
                            walkLength: Broadcast[Int]) = {
-    walkers.filter(_._2._3 == walkLength.value).map { case (_, (paths, _, _)) =>
+    walkers.filter(_._2._3).map { case (_, (paths, _, _)) =>
       paths
     }
   }
 
-  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Int))]): RDD[
-    (Int, (Array[Int], Array[(Int, Float)], Int))]
+  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]): RDD[
+    (Int, (Array[Int], Array[(Int, Float)], Boolean))]
 
   def save(paths: RDD[Array[Int]], partitions: Int, output: String) = {
 

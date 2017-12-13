@@ -120,9 +120,9 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val graph = sc.parallelize(Array(v1, v2, v3)).partitionBy(partitioner)
     val rTable = rw.buildRoutingTable(graph)
 
-    val w1 = (pId, (Array.empty[Int], Array.empty[(Int, Float)], 0))
-    val w2 = (pId, (Array.empty[Int], Array.empty[(Int, Float)], 0))
-    val w3 = (pId, (Array.empty[Int], Array.empty[(Int, Float)], 0))
+    val w1 = (pId, (Array.empty[Int], Array.empty[(Int, Float)], false))
+    val w2 = (pId, (Array.empty[Int], Array.empty[(Int, Float)], false))
+    val w3 = (pId, (Array.empty[Int], Array.empty[(Int, Float)], false))
 
     val walkers = sc.parallelize(Array(w3, w1, w2)).partitionBy(partitioner)
     val tWalkers = rw.transferWalkersToTheirPartitions(rTable, walkers)
@@ -142,12 +142,9 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
 
     val pId = 0
     val p1 = Array(1, 2,3, 4)
-    val wl1 = 5
-    val w1 = (pId, (p1, Array.empty[(Int, Float)], wl1))
-    val p21 = Array.empty[Int]
+    val w1 = (pId, (p1, Array.empty[(Int, Float)], false))
     val p2 = Array(2, 5)
-    val wl2 = 2
-    val w2 = (pId, (p2, Array.empty[(Int, Float)], wl2))
+    val w2 = (pId, (p2, Array.empty[(Int, Float)], false))
 
     val walkers = sc.parallelize(Array(w1, w2))
 
@@ -160,10 +157,10 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     ////      case Some(w) => (w._2 sameElements p12) && (w._4 == op1) && (w._5 == wl1)
     ////      case None => false
     ////    })
-    assert((l1._1 sameElements p1) && (l1._3 == wl1))
+    assert((l1._1 sameElements p1))
     //
     val l2 = preparedWalkers.filter(_._2._1.head == p2.head)(0)._2
-    assert((l2._1 sameElements p2) && (l2._3 == wl2))
+    assert((l2._1 sameElements p2))
     //    assert(map.get(last2) match {
     //      case Some(w) => (w._2 sameElements p22) && (w._4 == op2) && (w._5 == wl2)
     //      case None => false
@@ -173,14 +170,14 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
   test("filterUnfinishedWalkers") {
     val walkLength = sc.broadcast(4)
     val pId = 0
-    val p1 = (pId, (Array(1), Array.empty[(Int, Float)], walkLength.value))
-    val p2 = (pId, (Array(2), Array.empty[(Int, Float)], walkLength.value - 2))
-    val p3 = (pId, (Array(3), Array.empty[(Int, Float)], walkLength.value - 1))
+    val p1 = (pId, (Array(1), Array.empty[(Int, Float)], true))
+    val p2 = (pId, (Array(2), Array.empty[(Int, Float)], false))
+    val p3 = (pId, (Array(3), Array.empty[(Int, Float)], false))
     val walkers = sc.parallelize(Array(p1, p2, p3))
 
     val rw = VCutRandomWalk(sc, Params())
 
-    val filteredWalkers = rw.filterUnfinishedWalkers(walkers, walkLength).collect()
+    val filteredWalkers = rw.filterUnfinishedWalkers(walkers).collect()
 
     assert(filteredWalkers.size == 2)
     assert(filteredWalkers.filter(_._2._1.head == p2._2._1.head).length == 1)

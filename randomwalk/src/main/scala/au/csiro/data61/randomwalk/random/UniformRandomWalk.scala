@@ -3,7 +3,6 @@ package au.csiro.data61.randomwalk.random
 import au.csiro.data61.randomwalk.common.Params
 import au.csiro.data61.randomwalk.{RandomSample, RandomWalk}
 import org.apache.spark.SparkContext
-import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
@@ -101,13 +100,13 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     for (_ <- 0 until numberOfWalks.value) {
       //      val pathsPieces: mutable.ListBuffer[RDD[(Int, (Array[Int], Int))]] = ListBuffer
       // .empty
-      var unfinishedWalkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Int))] =
+      var unfinishedWalkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))] =
       initFirstStep(initPaths, nextFloat)
       var pathsPieces: RDD[Array[Int]] = context.emptyRDD[Array[Int]].repartition(config
         .rddPartitions)
       var prevPieces: RDD[Array[Int]] = null
-      var prevUnfinished: RDD[(Int, (Array[Int], Array[(Int, Float)], Int))] =
-        context.emptyRDD[(Int, (Array[Int], Array[(Int, Float)], Int))]
+      var prevUnfinished: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))] =
+        context.emptyRDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]
       var remainingWalkers = Int.MaxValue
 
       val acc = context.longAccumulator("Error finder")
@@ -121,7 +120,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
         pathsPieces.count()
         prevUnfinished = unfinishedWalkers
         unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
-          prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers, walkLength)))
+          prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers)))
         val oldCount = remainingWalkers
         remainingWalkers = unfinishedWalkers.count().toInt
         prevUnfinished.unpersist(blocking = false)
@@ -140,13 +139,13 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
 
         unfinishedWalkers = unfinishedWalkers.mapPartitions({ iter =>
           iter.map { case (pId, (steps: Array[Int], prevNeighbors: Array[(Int, Float)],
-          numSteps: Int)) =>
+          completed: Boolean)) =>
             var path = steps
-            var stepCounter = numSteps
+            var isCompleted = completed
             val rSample = RandomSample(nextFloat)
             var pNeighbors = prevNeighbors
             breakable {
-              while (stepCounter < walkLength.value) {
+              while (!isCompleted && path.length != walkLength.value + 2) {
                 val curr = path.last
                 val currNeighbors = RandomGraphMap.getNeighbors(curr)
                 val prev = path(path.length - 2)
@@ -155,12 +154,11 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
                 }
                 if (currNeighbors != null) {
                   if (currNeighbors.length > 0) {
-                    stepCounter += 1
                     val (nextStep, _) = rSample.secondOrderSample(bcP.value.toInt, bcQ.value
                       .toInt, prev, pNeighbors, currNeighbors)
                     path = path ++ Array(nextStep)
                   } else {
-                    stepCounter = walkLength.value
+                    isCompleted = true
                     acc2.add(1)
                     break
                     // This walker has reached a deadend. Needs to stop.
@@ -177,7 +175,10 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
               }
             }
 
-            (pId, (path, pNeighbors, stepCounter))
+            if (path.length == walkLength.value + 2)
+              isCompleted = true
+            
+            (pId, (path, pNeighbors, isCompleted))
           }
         }
           , preservesPartitioning = true
@@ -208,36 +209,34 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
 
   }
 
-  def filterUnfinishedWalkers(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Int))],
-                              walkLength: Broadcast[Int]) = {
-    walkers.filter(_._2._3 < walkLength.value)
+  def filterUnfinishedWalkers(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]) = {
+    walkers.filter(!_._2._3)
   }
 
   def initFirstStep(paths: RDD[(Int, Array[Int])], nextFloat: () =>
-    Float = Random.nextFloat): RDD[(Int, (Array[Int], Array[(Int, Float)], Int))] = {
+    Float = Random.nextFloat): RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))] = {
     val walkLength = context.broadcast(config.walkLength)
     paths.mapPartitions({ iter =>
-      val zeroStep = 0
       iter.map { case (src: Int, path: Array[Int]) =>
         val neighbors = RandomGraphMap.getNeighbors(path.head)
         if (neighbors != null && neighbors.length > 0) {
           val (nextStep, _) = RandomSample(nextFloat).sample(neighbors)
-          (src, (path ++ Array(nextStep), RandomGraphMap.getNeighbors(src), zeroStep))
+          (src, (path ++ Array(nextStep), RandomGraphMap.getNeighbors(src), false))
         } else {
           // It's a deadend.
-          (src, (path, Array.empty[(Int, Float)], walkLength.value))
+          (src, (path, Array.empty[(Int, Float)], true))
         }
       }
     }, preservesPartitioning = true
     )
   }
 
-  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Int))]) = {
+  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]) = {
     walkers.mapPartitions({
       iter =>
         iter.map {
-          case (_, (steps, prevNeighbors, stepCounter)) => (steps.last, (steps, prevNeighbors,
-            stepCounter))
+          case (_, (steps, prevNeighbors, completed)) => (steps.last, (steps, prevNeighbors,
+            completed))
         }
     }, preservesPartitioning = false)
 

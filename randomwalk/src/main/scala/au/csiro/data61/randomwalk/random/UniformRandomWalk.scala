@@ -104,38 +104,41 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
       initFirstStep(initPaths, nextFloat)
       var pathsPieces: RDD[Array[Int]] = context.emptyRDD[Array[Int]].repartition(config
         .rddPartitions)
-      var prevPieces: RDD[Array[Int]] = null
-      var prevUnfinished: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))] =
-        context.emptyRDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]
+//      var prevPieces: RDD[Array[Int]] = null
+//      var prevUnfinished: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))] =
+//        context.emptyRDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]
       var remainingWalkers = Int.MaxValue
 
       val acc = context.longAccumulator("Error finder")
       val acc2 = context.longAccumulator("Error finder")
       do {
 
-        prevPieces = pathsPieces
-        pathsPieces = context.union(filterCompletedPaths(unfinishedWalkers),
-          pathsPieces)
-          .persist(StorageLevel.MEMORY_AND_DISK)
-        pathsPieces.count()
-        prevUnfinished = unfinishedWalkers
+//        prevPieces = pathsPieces
+//        pathsPieces = context.union(filterCompletedPaths(unfinishedWalkers),
+//          pathsPieces)
+//          .persist(StorageLevel.MEMORY_AND_DISK)
+//        pathsPieces.count()
+//        prevUnfinished = unfinishedWalkers
+//        unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
+//          prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers)))
+//        val oldCount = remainingWalkers
+//        remainingWalkers = unfinishedWalkers.count().toInt
+//        prevUnfinished.unpersist(blocking = false)
+//        prevPieces.unpersist(blocking = false)
+//        if (remainingWalkers > oldCount) {
+//          logger.warn(s"Inconsistent state: number of unfinished walkers was increased!")
+//          println(s"Inconsistent state: number of unfinished walkers was increased!")
+//        }
+//        println(s"Unfinished Walkers: $remainingWalkers")
+//        if (!acc.isZero || !acc2.isZero) {
+//          println(s"Wrong Transports: ${acc.sum}")
+//          println(s"Zero Neighbors: ${acc2.sum}")
+//          acc.reset()
+//          acc2.reset()
+//        }
+
         unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
-          prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers)))
-        val oldCount = remainingWalkers
-        remainingWalkers = unfinishedWalkers.count().toInt
-        prevUnfinished.unpersist(blocking = false)
-        prevPieces.unpersist(blocking = false)
-        if (remainingWalkers > oldCount) {
-          logger.warn(s"Inconsistent state: number of unfinished walkers was increased!")
-          println(s"Inconsistent state: number of unfinished walkers was increased!")
-        }
-        println(s"Unfinished Walkers: $remainingWalkers")
-        if (!acc.isZero || !acc2.isZero) {
-          println(s"Wrong Transports: ${acc.sum}")
-          println(s"Zero Neighbors: ${acc2.sum}")
-          acc.reset()
-          acc2.reset()
-        }
+          prepareWalkersToTransfer(unfinishedWalkers))
 
         unfinishedWalkers = unfinishedWalkers.mapPartitions({ iter =>
           iter.map { case (pId, (steps: Array[Int], prevNeighbors: Array[(Int, Float)],
@@ -164,7 +167,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
                     // This walker has reached a deadend. Needs to stop.
                   }
                 } else {
-                  if (path.length == 2) {
+                  if (path.length == steps.length) {
                     acc.add(1)
                   }
                   // The walker has reached to the edge of the partition. Needs a ride to
@@ -183,6 +186,28 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
         }
           , preservesPartitioning = true
         ).persist(StorageLevel.MEMORY_AND_DISK)
+
+        pathsPieces = pathsPieces.union(filterCompletedPaths(unfinishedWalkers))
+          .persist(StorageLevel.MEMORY_AND_DISK)
+        pathsPieces.count()
+
+        unfinishedWalkers = filterUnfinishedWalkers(unfinishedWalkers)
+
+        val oldCount = remainingWalkers
+        //        remainingWalkers = filterUnfinishedWalkers(unfinishedWalkers).count().toInt
+        remainingWalkers = unfinishedWalkers.count().toInt
+
+        if (remainingWalkers > oldCount) {
+          logger.warn(s"Inconsistent state: number of unfinished walkers was increased!")
+          println(s"Inconsistent state: number of unfinished walkers was increased!")
+        }
+        println(s"Unfinished Walkers: $remainingWalkers")
+        if (!acc.isZero || !acc2.isZero) {
+          println(s"Wrong Transports: ${acc.sum}")
+          println(s"Zero Neighbors: ${acc2.sum}")
+          acc.reset()
+          acc2.reset()
+        }
       }
       while (remainingWalkers != 0)
 

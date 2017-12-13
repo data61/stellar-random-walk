@@ -110,8 +110,8 @@ case class VCutRandomWalk(context: SparkContext,
     for (_ <- 0 until config.numWalks) {
       var unfinishedWalkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))] = initFirstStep(
         initPaths, nextFloat)
-      //      var pathsPieces: RDD[Array[Int]] = context.emptyRDD[Array[Int]].repartition(config
-      //        .rddPartitions)
+      var pathsPieces: RDD[Array[Int]] = context.emptyRDD[Array[Int]].repartition(config
+        .rddPartitions)
       //      var prevPieces: RDD[Array[Int]] = context.emptyRDD[Array[Int]]
       //      var prevUnfinished: RDD[(Int, (Array[Int], Array[(Int, Float)], Int))] =
       //        context.emptyRDD[(Int, (Array[Int], Array[(Int, Float)], Int))]
@@ -122,16 +122,14 @@ case class VCutRandomWalk(context: SparkContext,
       do {
 
         //        prevPieces = pathsPieces
-        //        pathsPieces = pathsPieces.union(filterCompletedPaths(unfinishedWalkers,
-        // walkLength))
+        //        pathsPieces = pathsPieces.union(filterCompletedPaths(unfinishedWalkers))
         //          .persist(StorageLevel.MEMORY_AND_DISK)
         //        pathsPieces.count()
-        //        prevUnfinished = unfinishedWalkers
+        //        //        prevUnfinished = unfinishedWalkers
         //        unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
-        //          prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers,
-        // walkLength)))
-        unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
-          prepareWalkersToTransfer(unfinishedWalkers))
+        //          prepareWalkersToTransfer(filterUnfinishedWalkers(unfinishedWalkers)))
+        //        unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
+        //          prepareWalkersToTransfer(unfinishedWalkers))
         //        val oldCount = remainingWalkers
         //        remainingWalkers = unfinishedWalkers.count().toInt
         //        prevUnfinished.unpersist(blocking = false)
@@ -148,18 +146,23 @@ case class VCutRandomWalk(context: SparkContext,
         //          acc2.reset()
         //        }
 
+        //        prevUnfinished = unfinishedWalkers
+        unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
+          prepareWalkersToTransfer(unfinishedWalkers))
+
         unfinishedWalkers = unfinishedWalkers.mapPartitions({ iter =>
           iter.map { case (pId, (steps: Array[Int], prevNeighbors: Array[(Int, Float)],
           completed: Boolean)) =>
             var path = steps
             var isCompleted = completed
             val rSample = RandomSample(nextFloat)
-            var pNeighbors: Array[(Int, Float)]= prevNeighbors
+            var pNeighbors: Array[(Int, Float)] = prevNeighbors
             breakable {
               while (!isCompleted && path.length != walkLength.value + 2) {
                 val currNeighbors = PartitionedGraphMap.getNeighbors(path.last)
                 val prev = path(path.length - 2)
-                if (path.length > steps.length) { // If the walker is continuing on the local partition.
+                if (path.length > steps.length) { // If the walker is continuing on the local
+                  // partition.
                   pNeighbors = PartitionedGraphMap.getNeighbors(prev)
                 }
                 if (currNeighbors != null) {
@@ -174,7 +177,7 @@ case class VCutRandomWalk(context: SparkContext,
                     // This walker has reached a deadend. Needs to stop.
                   }
                 } else {
-                  if (path.length == 2) {
+                  if (path.length == steps.length) {
                     acc.add(1)
                   }
                   // The walker has reached to the edge of the partition. Needs a ride to
@@ -193,8 +196,15 @@ case class VCutRandomWalk(context: SparkContext,
           , preservesPartitioning = true
         ).persist(StorageLevel.MEMORY_AND_DISK)
 
+        pathsPieces = pathsPieces.union(filterCompletedPaths(unfinishedWalkers))
+          .persist(StorageLevel.MEMORY_AND_DISK)
+        pathsPieces.count()
+
+        unfinishedWalkers = filterUnfinishedWalkers(unfinishedWalkers)
+
         val oldCount = remainingWalkers
-        remainingWalkers = filterUnfinishedWalkers(unfinishedWalkers).count().toInt
+        //        remainingWalkers = filterUnfinishedWalkers(unfinishedWalkers).count().toInt
+        remainingWalkers = unfinishedWalkers.count().toInt
 
         if (remainingWalkers > oldCount) {
           logger.warn(s"Inconsistent state: number of unfinished walkers was increased!")
@@ -210,13 +220,13 @@ case class VCutRandomWalk(context: SparkContext,
       }
       while (remainingWalkers != 0)
 
-      val paths = filterCompletedPaths(unfinishedWalkers).persist(StorageLevel
-        .MEMORY_AND_DISK)
-      val pCount = paths.count()
+//      val paths = filterCompletedPaths(unfinishedWalkers).persist(StorageLevel
+//        .MEMORY_AND_DISK)
+      val pCount = pathsPieces.count()
       if (pCount != nVertices) {
         println(s"Inconsistent number of paths: nPaths=[${pCount}] != vertices[$nVertices]")
       }
-      totalPaths = totalPaths.union(paths).persist(StorageLevel
+      totalPaths = totalPaths.union(pathsPieces).persist(StorageLevel
         .MEMORY_AND_DISK)
 
       totalPaths.count()

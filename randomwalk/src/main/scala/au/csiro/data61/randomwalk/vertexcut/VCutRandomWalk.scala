@@ -154,13 +154,12 @@ case class VCutRandomWalk(context: SparkContext,
             var path = steps
             var isCompleted = completed
             val rSample = RandomSample(nextFloat)
-            var pNeighbors = prevNeighbors
+            var pNeighbors: Array[(Int, Float)]= prevNeighbors
             breakable {
               while (!isCompleted && path.length != walkLength.value + 2) {
-                val curr = path.last
-                val currNeighbors = PartitionedGraphMap.getNeighbors(curr)
+                val currNeighbors = PartitionedGraphMap.getNeighbors(path.last)
                 val prev = path(path.length - 2)
-                if (path.length > 2) { // If the walker is continuing on the local partition.
+                if (path.length > steps.length) { // If the walker is continuing on the local partition.
                   pNeighbors = PartitionedGraphMap.getNeighbors(prev)
                 }
                 if (currNeighbors != null) {
@@ -211,7 +210,7 @@ case class VCutRandomWalk(context: SparkContext,
       }
       while (remainingWalkers != 0)
 
-      val paths = filterCompletedPaths(unfinishedWalkers, walkLength).persist(StorageLevel
+      val paths = filterCompletedPaths(unfinishedWalkers).persist(StorageLevel
         .MEMORY_AND_DISK)
       val pCount = paths.count()
       if (pCount != nVertices) {

@@ -42,8 +42,7 @@ trait RandomWalk extends Serializable {
 //    walkers.filter(_._2._3 < walkLength.value)
 //  }
 
-  def filterCompletedPaths(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))],
-                           walkLength: Broadcast[Int]) = {
+  def filterCompletedPaths(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]) = {
     walkers.filter(_._2._3).map { case (_, (paths, _, _)) =>
       paths
     }

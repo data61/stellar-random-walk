@@ -114,7 +114,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
       do {
 
         prevPieces = pathsPieces
-        pathsPieces = context.union(filterCompletedPaths(unfinishedWalkers, walkLength),
+        pathsPieces = context.union(filterCompletedPaths(unfinishedWalkers),
           pathsPieces)
           .persist(StorageLevel.MEMORY_AND_DISK)
         pathsPieces.count()
@@ -143,13 +143,13 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
             var path = steps
             var isCompleted = completed
             val rSample = RandomSample(nextFloat)
-            var pNeighbors = prevNeighbors
+            var pNeighbors: Array[(Int, Float)] = prevNeighbors
             breakable {
               while (!isCompleted && path.length != walkLength.value + 2) {
                 val curr = path.last
                 val currNeighbors = RandomGraphMap.getNeighbors(curr)
                 val prev = path(path.length - 2)
-                if (path.length > 2) { // If the walker is continuing on the local partition.
+                if (path.length > steps.length){
                   pNeighbors = RandomGraphMap.getNeighbors(prev)
                 }
                 if (currNeighbors != null) {
@@ -177,7 +177,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
 
             if (path.length == walkLength.value + 2)
               isCompleted = true
-            
+
             (pId, (path, pNeighbors, isCompleted))
           }
         }

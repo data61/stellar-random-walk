@@ -1,11 +1,11 @@
-package au.csiro.data61.randomwalk.random
+package au.csiro.data61.randomwalk.algorithm
 
-import au.csiro.data61.randomwalk.RandomSample
 import au.csiro.data61.randomwalk.common.Params
+import au.csiro.data61.randomwalk.{GraphMap, RandomSample}
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 import org.scalatest.BeforeAndAfter
 
-class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
+class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with Serializable {
 
   private val master = "local[*]" // Note that you need to verify unit tests in a multi-core
   // computer.
@@ -25,12 +25,12 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     if (sc != null) {
       sc.stop()
     }
-    RandomGraphMap.reset
+    GraphMap.reset
   }
 
   test("load graph as undirected") {
     val config = Params(input = "./src/test/graph/karate.txt", directed = false)
-    val rw = UniformRandomWalk(sc, config)
+    val rw = VCutRandomWalk(sc, config)
     val paths = rw.loadGraph() // loadGraph(int)
     assert(rw.nEdges == 156)
     assert(rw.nVertices == 34)
@@ -38,8 +38,8 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val vAcc = sc.longAccumulator("v")
     val eAcc = sc.longAccumulator("e")
     paths.coalesce(1).mapPartitions { iter =>
-      vAcc.add(RandomGraphMap.getNumVertices)
-      eAcc.add(RandomGraphMap.getNumEdges)
+      vAcc.add(GraphMap.getNumVertices)
+      eAcc.add(GraphMap.getNumEdges)
       iter
     }.first()
     assert(eAcc.sum == 156)
@@ -48,7 +48,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
 
   test("load graph as directed") {
     val config = Params(input = "./src/test/graph/karate.txt", directed = true)
-    val rw = UniformRandomWalk(sc, config)
+    val rw = VCutRandomWalk(sc, config)
     val paths = rw.loadGraph()
     assert(rw.nEdges == 78)
     assert(rw.nVertices == 34)
@@ -56,8 +56,8 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val vAcc = sc.longAccumulator("v")
     val eAcc = sc.longAccumulator("e")
     paths.coalesce(1).mapPartitions { iter =>
-      vAcc.add(RandomGraphMap.getNumVertices)
-      eAcc.add(RandomGraphMap.getNumEdges)
+      vAcc.add(GraphMap.getNumVertices)
+      eAcc.add(GraphMap.getNumEdges)
       iter
     }.first()
     assert(eAcc.sum == 78)
@@ -66,7 +66,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
 
   test("the first step of Random Walk") {
     val config = Params(input = "./src/test/graph/testgraph.txt", directed = true)
-    val rw = UniformRandomWalk(sc, config)
+    val rw = VCutRandomWalk(sc, config)
     val paths = rw.loadGraph()
     val result = rw.initFirstStep(paths)
     assert(result.count == paths.count())
@@ -84,16 +84,17 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
   }
 
   test("buildRoutingTable") {
-    val v1 = (1, (Array.empty[(Int, Float)]))
-    val v2 = (2, (Array.empty[(Int, Float)]))
-    val v3 = (3, (Array.empty[(Int, Float)]))
+    val pId = 0
+    val v1 = (pId, (1, Array.empty[(Int, Int, Float)]))
+    val v2 = (pId, (2, Array.empty[(Int, Int, Float)]))
+    val v3 = (pId, (3, Array.empty[(Int, Int, Float)]))
     val numPartitions = 3
     val partitioner = new HashPartitioner(numPartitions)
 
     val graph = sc.parallelize(Array(v1, v2, v3)).partitionBy(partitioner)
 
     val config = Params(rddPartitions = numPartitions)
-    val rw = UniformRandomWalk(sc, config)
+    val rw = VCutRandomWalk(sc, config)
     val rTable = rw.buildRoutingTable(graph)
     assert(rTable.getNumPartitions == numPartitions)
     assert(rTable.partitioner match {
@@ -107,20 +108,21 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
 
 
   test("transferWalkersToTheirPartitions") {
-    val v1 = (1, (Array.empty[(Int, Float)]))
-    val v2 = (2, (Array.empty[(Int, Float)]))
-    val v3 = (3, (Array.empty[(Int, Float)]))
+    val pId = 0
+    val v1 = (pId, (1, Array.empty[(Int, Int, Float)]))
+    val v2 = (pId, (2, Array.empty[(Int, Int, Float)]))
+    val v3 = (pId, (3, Array.empty[(Int, Int, Float)]))
     val numPartitions = 8
 
     val config = Params(rddPartitions = numPartitions)
-    val rw = UniformRandomWalk(sc, config)
+    val rw = VCutRandomWalk(sc, config)
     val partitioner = rw.partitioner
     val graph = sc.parallelize(Array(v1, v2, v3)).partitionBy(partitioner)
     val rTable = rw.buildRoutingTable(graph)
 
-    val w1 = (1, (Array.empty[Int], Array.empty[(Int, Float)], false))
-    val w2 = (2, (Array.empty[Int], Array.empty[(Int, Float)], false))
-    val w3 = (3, (Array.empty[Int], Array.empty[(Int, Float)], false))
+    val w1 = (pId, (Array.empty[Int], Array.empty[(Int, Float)], false))
+    val w2 = (pId, (Array.empty[Int], Array.empty[(Int, Float)], false))
+    val w3 = (pId, (Array.empty[Int], Array.empty[(Int, Float)], false))
 
     val walkers = sc.parallelize(Array(w3, w1, w2)).partitionBy(partitioner)
     val tWalkers = rw.transferWalkersToTheirPartitions(rTable, walkers)
@@ -138,41 +140,48 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
 
   test("prepareWalkersToTransfer") {
 
-    val p1 = Array(1, 2, 3, 4)
-    val op1 = 1
-    val w1 = (op1, (p1, Array.empty[(Int, Float)], false))
+    val pId = 0
+    val p1 = Array(1, 2,3, 4)
+    val w1 = (pId, (p1, Array.empty[(Int, Float)], false))
     val p2 = Array(2, 5)
-    val op2 = 2
-    val w2 = (op2, (p2, Array.empty[(Int, Float)], false))
+    val w2 = (pId, (p2, Array.empty[(Int, Float)], false))
 
     val walkers = sc.parallelize(Array(w1, w2))
 
-    val rw = UniformRandomWalk(sc, Params())
+    val rw = VCutRandomWalk(sc, Params())
 
     val preparedWalkers = rw.prepareWalkersToTransfer(walkers).collect()
     assert(preparedWalkers.length == 2)
     val l1 = preparedWalkers.filter(_._2._1.head == p1.head)(0)._2
-
+    ////    assert(map.get(last1) match {
+    ////      case Some(w) => (w._2 sameElements p12) && (w._4 == op1) && (w._5 == wl1)
+    ////      case None => false
+    ////    })
     assert((l1._1 sameElements p1))
     //
     val l2 = preparedWalkers.filter(_._2._1.head == p2.head)(0)._2
     assert((l2._1 sameElements p2))
+    //    assert(map.get(last2) match {
+    //      case Some(w) => (w._2 sameElements p22) && (w._4 == op2) && (w._5 == wl2)
+    //      case None => false
+    //    })
   }
 
   test("filterUnfinishedWalkers") {
     val walkLength = sc.broadcast(4)
-    val p1 = (1, (Array.empty[Int], Array.empty[(Int, Float)], true))
-    val p2 = (2, (Array.empty[Int], Array.empty[(Int, Float)], false))
-    val p3 = (3, (Array.empty[Int], Array.empty[(Int, Float)], false))
+    val pId = 0
+    val p1 = (pId, (Array(1), Array.empty[(Int, Float)], true))
+    val p2 = (pId, (Array(2), Array.empty[(Int, Float)], false))
+    val p3 = (pId, (Array(3), Array.empty[(Int, Float)], false))
     val walkers = sc.parallelize(Array(p1, p2, p3))
 
-    val rw = UniformRandomWalk(sc, Params())
+    val rw = VCutRandomWalk(sc, Params())
 
     val filteredWalkers = rw.filterUnfinishedWalkers(walkers).collect()
 
     assert(filteredWalkers.size == 2)
-    assert(filteredWalkers.filter(_._1 == p2._1).length == 1)
-    assert(filteredWalkers.filter(_._1 == p3._1).length == 1)
+    assert(filteredWalkers.filter(_._2._1.head == p2._2._1.head).length == 1)
+    assert(filteredWalkers.filter(_._2._1.head == p3._2._1.head).length == 1)
 
   }
 
@@ -183,13 +192,13 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val nextFloatGen = () => rValue
     val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
-    val rw = UniformRandomWalk(sc, config)
+    val rw = VCutRandomWalk(sc, config)
     val graph = rw.loadGraph()
     val paths = rw.randomWalk(graph, nextFloatGen)
     val rSampler = RandomSample(nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
   }
@@ -201,13 +210,13 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val wLength = 50
     val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
-    val rw = UniformRandomWalk(sc, config)
+    val rw = VCutRandomWalk(sc, config)
     val graph = rw.loadGraph()
     val paths = rw.randomWalk(graph, nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
 
     }
@@ -220,13 +229,13 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
       wLength, rddPartitions = 8, numWalks = 1)
     val rValue = 0.9f
     val nextFloatGen = () => rValue
-    val rw = UniformRandomWalk(sc, config)
+    val rw = VCutRandomWalk(sc, config)
     val graph = rw.loadGraph()
     val paths = rw.randomWalk(graph, nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
   }
@@ -238,13 +247,13 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val wLength = 50
     val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
-    val rw = UniformRandomWalk(sc, config)
+    val rw = VCutRandomWalk(sc, config)
     val graph = rw.loadGraph()
     val paths = rw.randomWalk(graph, nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
   }
@@ -257,13 +266,13 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     // Directed Graph
     val config = Params(input = "./src/test/graph/karate.txt", directed = true, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
-    val rw = UniformRandomWalk(sc, config)
+    val rw = VCutRandomWalk(sc, config)
     val graph = rw.loadGraph()
     val paths = rw.randomWalk(graph, nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
   }
@@ -275,7 +284,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     // Directed Graph
     val config = Params(input = "./src/test/graph/karate.txt", directed = true, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
-    val rw = UniformRandomWalk(sc, config)
+    val rw = VCutRandomWalk(sc, config)
     val rValue = 0.1f
     val nextFloatGen = () => rValue
     val graph = rw.loadGraph()
@@ -283,12 +292,12 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(RandomGraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
+      val p2 = doSecondOrderRandomWalk(GraphMap, p(0), wLength, rSampler, 1.0f, 1.0f)
       assert(p sameElements p2)
     }
   }
 
-  private def doSecondOrderRandomWalk(gMap: RandomGraphMap.type, src: Int,
+  private def doSecondOrderRandomWalk(gMap: GraphMap.type, src: Int,
                                       walkLength: Int, rSampler: RandomSample, p: Float,
                                       q: Float): Array[Int]
   = {

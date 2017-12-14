@@ -8,17 +8,64 @@ import scala.collection.mutable.{ArrayBuffer, HashMap}
   *
   */
 
-trait GraphMap[T] {
+object GraphMap {
 
-  protected lazy val srcVertexMap: mutable.Map[Int, Int] = new HashMap[Int, Int]()
-  protected lazy val offsets: ArrayBuffer[Int] = new ArrayBuffer()
-  protected lazy val lengths: ArrayBuffer[Int] = new ArrayBuffer()
-  protected lazy val edges: ArrayBuffer[(Int, Float)] = new ArrayBuffer()
-  protected var indexCounter: Int = 0
-  protected var offsetCounter: Int = 0
-  protected var firstGet: Boolean = true
+  private lazy val srcVertexMap: mutable.Map[Int, Int] = new HashMap[Int, Int]()
+  private lazy val offsets: ArrayBuffer[Int] = new ArrayBuffer()
+  private lazy val lengths: ArrayBuffer[Int] = new ArrayBuffer()
+  private lazy val edges: ArrayBuffer[(Int, Float)] = new ArrayBuffer()
+  private var indexCounter: Int = 0
+  private var offsetCounter: Int = 0
+  private var firstGet: Boolean = true
 
-  def addVertex(vId: Int, neighbors: Array[T])
+  private lazy val vertexPartitionMap: mutable.Map[Int, Int] = new HashMap[Int, Int]()
+
+  def addVertex(vId: Int, neighbors: Array[(Int, Int, Float)]): Unit = synchronized {
+    srcVertexMap.get(vId) match {
+      case None => {
+        if (!neighbors.isEmpty) {
+          updateIndices(vId, neighbors.length)
+          for ((dst, pId, weight) <- neighbors) {
+            edges.insert(offsetCounter, (dst, weight))
+            offsetCounter += 1
+            vertexPartitionMap.put(dst, pId)
+          }
+        } else {
+          this.addVertex(vId)
+        }
+      }
+      case Some(value) => value
+    }
+  }
+
+  def addVertex(vId: Int, neighbors: Array[(Int, Float)]): Unit = synchronized {
+    srcVertexMap.get(vId) match {
+      case None => {
+        if (!neighbors.isEmpty) {
+          updateIndices(vId, neighbors.length)
+          for (e <- neighbors) {
+            edges.insert(offsetCounter, e)
+            offsetCounter += 1
+          }
+        } else {
+          this.addVertex(vId)
+        }
+      }
+      case Some(value) => value
+    }
+  }
+
+  private def updateIndices(vId:Int, outDegree:Int): Unit =
+  {
+    srcVertexMap.put(vId, indexCounter)
+    offsets.insert(indexCounter, offsetCounter)
+    lengths.insert(indexCounter, outDegree)
+    indexCounter += 1
+  }
+
+  def getPartition(vId: Int): Option[Int] = {
+    vertexPartitionMap.get(vId)
+  }
 
   def getGraphStatsOnlyOnce: (Int, Int) = synchronized {
     if (firstGet) {
@@ -56,6 +103,7 @@ trait GraphMap[T] {
     offsets.clear()
     lengths.clear()
     edges.clear()
+    vertexPartitionMap.clear
   }
 
   def getNeighbors(vid: Int): Array[(Int, Float)] = {

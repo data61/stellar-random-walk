@@ -1,9 +1,9 @@
 package au.csiro.data61.randomwalk
 
+import au.csiro.data61.randomwalk.algorithm.VCutRandomWalk
 import au.csiro.data61.randomwalk.common.CommandParser.TaskName
 import au.csiro.data61.randomwalk.common.{CommandParser, Params, Property}
-import au.csiro.data61.randomwalk.random.UniformRandomWalk
-import au.csiro.data61.randomwalk.vertexcut.VCutRandomWalk
+import au.csiro.data61.randomwalk.algorithm.UniformRandomWalk
 import org.apache.log4j.LogManager
 import org.apache.spark.mllib.feature.{Word2Vec, Word2VecModel}
 import org.apache.spark.rdd.RDD

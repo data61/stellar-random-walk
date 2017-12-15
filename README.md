@@ -3,7 +3,7 @@ Spark implementation of neighborhood sampling and feature learning for large gra
 
 This repository includes the implementation of node2vec (Grover, Aditya, and Jure Leskovec. "node2vec: Scalable feature learning for networks." Proceedings of the 22nd ACM SIGKDD international conference on Knowledge discovery and data mining. ACM, 2016.).
 
-#Features#
+# Features #
 * Scalable node2vec
 * Second-order random walk
 * an efficient in-memory graph data structure introduced @ Spark Summit 2017 "Random Walks on Large Scale Graphs with Apache Spark" presented by Min Shen (LinkedIn)

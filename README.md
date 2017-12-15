@@ -1,5 +1,5 @@
 # node2vec #
-Spark implementation of neighborhood sampling and feature learning for large graphs:
+Spark+scala implementation of neighborhood sampling and feature learning for large graphs:
 
 This repository includes the implementation of node2vec (Grover, Aditya, and Jure Leskovec. "node2vec: Scalable feature learning for networks." Proceedings of the 22nd ACM SIGKDD international conference on Knowledge discovery and data mining. ACM, 2016.).
 

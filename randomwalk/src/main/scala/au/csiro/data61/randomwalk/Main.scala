@@ -1,45 +1,36 @@
 package au.csiro.data61.randomwalk
 
-import au.csiro.data61.randomwalk.algorithm.VCutRandomWalk
+import java.util
+
+import au.csiro.data61.randomwalk.algorithm.{UniformRandomWalk, VCutRandomWalk}
 import au.csiro.data61.randomwalk.common.CommandParser.TaskName
 import au.csiro.data61.randomwalk.common.{CommandParser, Params, Property}
-import au.csiro.data61.randomwalk.algorithm.UniformRandomWalk
+import com.typesafe.config.Config
 import org.apache.log4j.LogManager
 import org.apache.spark.mllib.feature.{Word2Vec, Word2VecModel}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
+import org.scalactic.{Every, Good, Or}
+import spark.jobserver.SparkJobInvalid
+import spark.jobserver.api._
 
-object Main {
+object Main extends SparkJob {
   lazy val logger = LogManager.getLogger("myLogger")
 
   def main(args: Array[String]) {
-    CommandParser.parse(args).map { param =>
-      val conf = new SparkConf().setAppName("Node2Vec")
-      if (param.useKyroSerializer) {
-        conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-        conf.set("spark.kryo.registrationRequired", "true")
-        //TODO: Register the newly added classes.
-        //        conf.registerKryoClasses(Array(...))
-      }
-      val context: SparkContext = new SparkContext(conf)
-      param.cmd match {
-        case TaskName.node2vec =>
-          val paths = doRandomWalk(context, param)
-          val word2Vec = configureWord2Vec(param)
-          val model = word2Vec.fit(convertPathsToIterables(paths))
-          saveModelAndFeatures(model, context, param)
-        case TaskName.randomwalk => doRandomWalk(context, param)
-
-        case TaskName.embedding => {
-          val paths = context.textFile(param.input).repartition(param.w2vPartitions).
-            map(_.split("\\s+").toSeq)
-          val word2Vec = configureWord2Vec(param)
-          val model = word2Vec.fit(paths)
-          saveModelAndFeatures(model, context, param)
+    CommandParser.parse(args) match {
+      case Some(params) =>
+        val conf = new SparkConf().setAppName("Node2Vec")
+        if (params.useKyroSerializer) {
+          conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+          conf.set("spark.kryo.registrationRequired", "true")
+          //TODO: Register the newly added classes.
+          //        conf.registerKryoClasses(Array(...))
         }
-      }
-    } getOrElse {
-      sys.exit(1)
+        val context: SparkContext = new SparkContext(conf)
+        runJob(context, null, params)
+
+      case None => sys.exit(1)
     }
   }
 
@@ -76,5 +67,37 @@ object Main {
       .setMinCount(0)
       .setVectorSize(param.w2vDim)
       .setWindowSize(param.w2vWindow)
+  }
+
+  override type JobData = Params
+  override type JobOutput = Unit
+
+  override def runJob(context: SparkContext, runtime: JobEnvironment, params: JobData): JobOutput
+  = {
+
+    params.cmd match {
+      case TaskName.node2vec =>
+        val paths = doRandomWalk(context, params)
+        val word2Vec = configureWord2Vec(params)
+        val model = word2Vec.fit(convertPathsToIterables(paths))
+        saveModelAndFeatures(model, context, params)
+      case TaskName.randomwalk => doRandomWalk(context, params)
+      case TaskName.embedding =>
+        val paths = context.textFile(params.input).repartition(params.w2vPartitions).
+          map(_.split("\\s+").toSeq)
+        val word2Vec = configureWord2Vec(params)
+        val model = word2Vec.fit(paths)
+        saveModelAndFeatures(model, context, params)
+    }
+  }
+
+  override def validate(sc: SparkContext, runtime: JobEnvironment, config: Config): JobData Or
+    Every[SparkJobInvalid] = {
+    //TODO: make an array of string as it is in args
+    val confList: util.List[String] = config.getStringList("randomwalk.args")
+    CommandParser.parse(confList.toArray(new Array[String](confList.size()))) match {
+      case Some(params) => Good(params)
+    }
+
   }
 }

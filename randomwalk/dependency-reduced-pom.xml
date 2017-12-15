@@ -67,6 +67,18 @@
       </plugin>
     </plugins>
   </build>
+  <repositories>
+    <repository>
+      <id>spark-jobserver-repo</id>
+      <name>SparkJobServer Repository</name>
+      <url>https://dl.bintray.com/spark-jobserver/maven/</url>
+    </repository>
+    <repository>
+      <id>central-maven</id>
+      <name>Central Repository</name>
+      <url>http://central.maven.org/maven2/</url>
+    </repository>
+  </repositories>
   <dependencies>
     <dependency>
       <groupId>org.scala-lang</groupId>
@@ -209,10 +221,6 @@
           <groupId>org.glassfish.jersey.containers</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>netty-all</artifactId>
-          <groupId>io.netty</groupId>
-        </exclusion>
-        <exclusion>
           <artifactId>netty</artifactId>
           <groupId>io.netty</groupId>
         </exclusion>
@@ -324,14 +332,6 @@
       <version>3.0.4</version>
       <scope>provided</scope>
       <exclusions>
-        <exclusion>
-          <artifactId>scalactic_2.11</artifactId>
-          <groupId>org.scalactic</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>scala-reflect</artifactId>
-          <groupId>org.scala-lang</groupId>
-        </exclusion>
         <exclusion>
           <artifactId>scala-xml_2.11</artifactId>
           <groupId>org.scala-lang.modules</groupId>

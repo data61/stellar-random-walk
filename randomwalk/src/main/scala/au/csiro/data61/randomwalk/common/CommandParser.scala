@@ -70,10 +70,10 @@ object CommandParser {
       .text(s"Window size in word2vec: ${defaultParams.w2vWindow}")
       .action((x, c) => c.copy(w2vWindow = x))
     note(
-      """
-        |For example, the following command runs this app on a synthetic dataset:
+      s"""
+        |For example, to run the application you can use the following command:
         |
-        | bin/spark-submit --class au.csiro.data61.randomwalk.Main \
+        | bin/spark-submit --class au.csiro.data61.randomwalk.Main --cmd ${TaskName.node2vec}\
       """.stripMargin +
         s"|   --lr ${defaultParams.w2vLr}" +
         s"|   --iter ${defaultParams.w2vIter}" +

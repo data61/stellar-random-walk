@@ -1,8 +1,7 @@
-package au.csiro.data61.randomwalk
+package au.csiro.data61.randomwalk.algorithm
 
 import au.csiro.data61.randomwalk.common.{Params, Property}
 import org.apache.log4j.LogManager
-import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{HashPartitioner, SparkContext}

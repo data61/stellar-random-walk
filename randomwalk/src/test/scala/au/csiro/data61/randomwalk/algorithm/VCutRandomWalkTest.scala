@@ -1,7 +1,6 @@
 package au.csiro.data61.randomwalk.algorithm
 
 import au.csiro.data61.randomwalk.common.Params
-import au.csiro.data61.randomwalk.{GraphMap, RandomSample}
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 import org.scalatest.BeforeAndAfter
 

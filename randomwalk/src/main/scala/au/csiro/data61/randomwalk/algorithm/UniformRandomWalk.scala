@@ -1,7 +1,6 @@
 package au.csiro.data61.randomwalk.algorithm
 
 import au.csiro.data61.randomwalk.common.Params
-import au.csiro.data61.randomwalk.{GraphMap, RandomWalk}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel

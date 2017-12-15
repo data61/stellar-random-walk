@@ -1,4 +1,4 @@
-package au.csiro.data61.randomwalk
+package au.csiro.data61.randomwalk.algorithm
 
 import org.scalatest.FunSuite
 

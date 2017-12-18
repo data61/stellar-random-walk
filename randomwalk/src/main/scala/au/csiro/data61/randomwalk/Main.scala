@@ -1,7 +1,5 @@
 package au.csiro.data61.randomwalk
 
-import java.util
-
 import au.csiro.data61.randomwalk.algorithm.{UniformRandomWalk, VCutRandomWalk}
 import au.csiro.data61.randomwalk.common.CommandParser.TaskName
 import au.csiro.data61.randomwalk.common.{CommandParser, Params, Property}
@@ -70,7 +68,7 @@ object Main extends SparkJob {
   }
 
   override type JobData = Params
-  override type JobOutput = Unit
+  override type JobOutput = String
 
   override def runJob(context: SparkContext, runtime: JobEnvironment, params: JobData): JobOutput
   = {
@@ -89,15 +87,14 @@ object Main extends SparkJob {
         val model = word2Vec.fit(paths)
         saveModelAndFeatures(model, context, params)
     }
+    params.output
   }
 
   override def validate(sc: SparkContext, runtime: JobEnvironment, config: Config): JobData Or
     Every[SparkJobInvalid] = {
-    //TODO: make an array of string as it is in args
-    val confList: util.List[String] = config.getStringList("randomwalk.args")
-    CommandParser.parse(confList.toArray(new Array[String](confList.size()))) match {
+    val args = config.getString("rw.input").split("\\s+")
+    CommandParser.parse(args) match {
       case Some(params) => Good(params)
     }
-
   }
 }

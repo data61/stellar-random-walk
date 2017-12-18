@@ -8,3 +8,4 @@ This repository includes the implementation of node2vec (Grover, Aditya, and Jur
 * Second-order random walk
 * an efficient in-memory graph data structure introduced @ Spark Summit 2017 "Random Walks on Large Scale Graphs with Apache Spark" presented by Min Shen (LinkedIn)
 * Leverages graph partition information in order to optimize the communication and to speed up the random walk computation
+* Compatible with [Spark-JobServer](https://github.com/spark-jobserver/spark-jobserver)

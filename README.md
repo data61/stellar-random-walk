@@ -55,9 +55,11 @@ and the following options are available:
 
    For example:
 
-   ` bin/spark-submit --class au.csiro.data61.randomwalk.Main ./randomwalk/target/randomwalk-0.0.1-SNAPSHOT.jar \
+   ```
+   bin/spark-submit --class au.csiro.data61.randomwalk.Main ./randomwalk/target/randomwalk-0.0.1-SNAPSHOT.jar \
    --cmd randomwalk --numWalks 1 --p 1 --q 1 --walkLength 10 --rddPartitions 10 \
-    --input [input edge list] --output [output directory] --partitioned false `
+   --input [input edge list] --output [output directory] --partitioned false
+   ```
 
 ## Graph File Format ##
 The input graph must be an edge list with integer vertex IDs. For example:
@@ -78,7 +80,7 @@ If the graph is partitioned, each edge should have a partition number, i.e., sho
 src1-id dst1-id 1 1.0
 src1-id dst2-id 1 1.0
 src3-id dst1-id 2 1.0
-...\ 
+... 
 ```
 
 The application itself will replicate (cut) those vertices that span among multiple partitions.

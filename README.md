@@ -33,7 +33,7 @@ To run the application on your machine, you can use spark-submit script. Go to t
 
 and the following options are available:
 
-`  --walkLength <value>     walkLength: 80
+```  --walkLength <value>     walkLength: 80
    --numWalks <value>       numWalks: 10
    --p <value>              return parameter p: 1.0
    --q <value>              in-out parameter q: 1.0
@@ -49,7 +49,7 @@ and the following options are available:
    --lr <value>             Learning rate in word2vec: 0.025
    --iter <value>           Number of iterations in word2vec: 10
    --dim <value>            Number of dimensions in word2vec: 128
-   --window <value>         Window size in word2vec: 10 `
+   --window <value>         Window size in word2vec: 10 ```
 
    For example:
 
@@ -60,9 +60,9 @@ and the following options are available:
 ## Graph File Format ##
 The input graph must be an edge list with integer vertex IDs. For example:
 
-` src1-id dst1-id
+``` src1-id dst1-id
 src1-id dst2-id
-... `
+... ```
 
 If the graph is weighted, it must include the weight in the last column for each edge. For example:
 
@@ -70,10 +70,10 @@ If the graph is weighted, it must include the weight in the last column for each
 
 If the graph is partitioned, each edge should have a partition number, i.e., should be assigned to a partition. The partition number must be in the third column of the edge list. For example:
 
-` src1-id dst1-id 1 1.0
+``` src1-id dst1-id 1 1.0
 src1-id dst2-id 1 1.0
 src3-id dst1-id 2 1.0
-...\ `
+...\ ```
 
 The application itself will replicate (cut) those vertices that span among multiple partitions.
 

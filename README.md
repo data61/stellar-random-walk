@@ -20,7 +20,7 @@ This repository includes the implementation of node2vec.
 ## Quick Setup ##
 First, you need to download the application source code. You need to go to the source code directory and run the following command:
 
-''' mvn clean package '''
+` mvn clean package `
 
 This creates a jar file named *randomwalk-0.0.1-SNAPSHOT.jar* in the directory *target*. To run the application, you use this jar file.
 
@@ -29,11 +29,11 @@ You need to download Apache Spark 2.2.0 or later in order to run the application
 ## Running the Application ##
 To run the application on your machine, you can use spark-submit script. Go to the Apache Spark directory. Run the application with the following command:
 
-' bin/spark-submit --class au.csiro.data61.randomwalk.Main ./randomwalk/target/randomwalk-0.0.1-SNAPSHOT.jar '
+` bin/spark-submit --class au.csiro.data61.randomwalk.Main ./randomwalk/target/randomwalk-0.0.1-SNAPSHOT.jar `
 
 and the following options are available:
 
-'  --walkLength <value>     walkLength: 80
+`  --walkLength <value>     walkLength: 80
    --numWalks <value>       numWalks: 10
    --p <value>              return parameter p: 1.0
    --q <value>              in-out parameter q: 1.0
@@ -49,31 +49,31 @@ and the following options are available:
    --lr <value>             Learning rate in word2vec: 0.025
    --iter <value>           Number of iterations in word2vec: 10
    --dim <value>            Number of dimensions in word2vec: 128
-   --window <value>         Window size in word2vec: 10 '
+   --window <value>         Window size in word2vec: 10 `
 
    For example:
 
-   'bin/spark-submit --class au.csiro.data61.randomwalk.Main ./randomwalk/target/randomwalk-0.0.1-SNAPSHOT.jar \
+   `bin/spark-submit --class au.csiro.data61.randomwalk.Main ./randomwalk/target/randomwalk-0.0.1-SNAPSHOT.jar \
    --cmd randomwalk --numWalks 1 --p 1 --q 1 --walkLength 10 --rddPartitions 10 \
-    --input [input edge list] --output [output directory] --partitioned false'
+    --input [input edge list] --output [output directory] --partitioned false`
 
 ## Graph File Format ##
 The input graph must be an edge list with integer vertex IDs. For example:
 
-' src1-id dst1-id
+` src1-id dst1-id
 src1-id dst2-id
-... '
+... `
 
 If the graph is weighted, it must include the weight in the last column for each edge. For example:
 
-' src1-id dst1-id 1.0 '
+` src1-id dst1-id 1.0 `
 
 If the graph is partitioned, each edge should have a partition number, i.e., should be assigned to a partition. The partition number must be in the third column of the edge list. For example:
 
-' src1-id dst1-id 1 1.0
+` src1-id dst1-id 1 1.0
 src1-id dst2-id 1 1.0
 src3-id dst1-id 2 1.0
-...\ '
+...\ `
 
 The application itself will replicate (cut) those vertices that span among multiple partitions.
 

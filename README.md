@@ -20,7 +20,7 @@ This repository includes the implementation of node2vec.
 ## Quick Setup ##
 First, you need to download the application source code. You need to go to the source code directory and run the following command:
 
-' mvn clean package '
+''' mvn clean package '''
 
 This creates a jar file named *randomwalk-0.0.1-SNAPSHOT.jar* in the directory *target*. To run the application, you use this jar file.
 

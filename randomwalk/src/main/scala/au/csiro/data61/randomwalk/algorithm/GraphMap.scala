@@ -7,7 +7,7 @@ import scala.collection.mutable.{ArrayBuffer, HashMap}
   *
   */
 
-case class GraphMap() {
+case class GraphMap()  {
 
   private lazy val srcVertexMap: mutable.Map[Int, Int] = new HashMap[Int, Int]()
   private lazy val offsets: ArrayBuffer[Int] = new ArrayBuffer()

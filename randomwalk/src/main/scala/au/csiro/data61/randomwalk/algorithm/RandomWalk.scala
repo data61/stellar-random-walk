@@ -7,7 +7,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{HashPartitioner, SparkContext}
 
-import scala.util.{Random, Try}
+import scala.util.Random
 import scala.util.control.Breaks.{break, breakable}
 
 trait RandomWalk extends Serializable {
@@ -28,7 +28,7 @@ trait RandomWalk extends Serializable {
     randomWalk(loadGraph(homo))
   }
 
-  def loadGraph(homogeneous:Boolean): RDD[(Int, Array[Int])]
+  def loadGraph(homogeneous: Boolean): RDD[(Int, Array[Int])]
 
   def loadNodeTypes(): RDD[(Int, Short)] = {
     config.vInput match {
@@ -109,8 +109,8 @@ trait RandomWalk extends Serializable {
                 mpi = ((mpi + 1) % mp.length).toShort
                 if (currNeighbors != null) {
                   if (currNeighbors.length > 0) {
-                    val (nextStep, _) = rSample.secondOrderSample(bcP.value.toInt, bcQ.value
-                      .toInt, path(path.length - 2), pNeighbors, currNeighbors)
+                    val (nextStep, _) = rSample.secondOrderSample(bcP.value.toFloat, bcQ.value
+                      .toFloat, path(path.length - 2), pNeighbors, currNeighbors)
                     path = path ++ Array(nextStep)
                   } else {
                     isCompleted = true
@@ -197,6 +197,7 @@ trait RandomWalk extends Serializable {
 
   def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean,
     Short))]): RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean, Short))]
+
 
   def save(paths: RDD[Array[Int]], partitions: Int, output: String) = {
 

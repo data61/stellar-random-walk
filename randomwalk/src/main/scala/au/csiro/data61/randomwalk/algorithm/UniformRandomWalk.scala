@@ -2,6 +2,7 @@ package au.csiro.data61.randomwalk.algorithm
 
 import au.csiro.data61.randomwalk.common.Params
 import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
@@ -14,33 +15,13 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     *
     * @return
     */
-  def loadGraph(): RDD[(Int, Array[Int])] = {
+  def loadGraph(hetero: Boolean): RDD[(Int, Array[Int])] = {
     // the directed and weighted parameters are only used for building the graph object.
     // is directed? they will be shared among stages and executors
-    val bcDirected = context.broadcast(config.directed)
-    val bcWeighted = context.broadcast(config.weighted) // is weighted?
-
-    val g: RDD[(Int, Array[(Int, Float)])] = context.textFile(config.input, minPartitions
-      = config
-      .rddPartitions).flatMap { triplet =>
-      val parts = triplet.split("\\s+")
-      // if the weights are not specified it sets it to 1.0
-
-      val weight = bcWeighted.value && parts.length > 2 match {
-        case true => Try(parts.last.toFloat).getOrElse(1.0f)
-        case false => 1.0f
-      }
-
-      val (src, dst) = (parts.head.toInt, parts(1).toInt)
-      if (bcDirected.value) {
-        Array((src, Array((dst, weight))), (dst, Array.empty[(Int, Float)]))
-      } else {
-        Array((src, Array((dst, weight))), (dst, Array((src, weight))))
-      }
-    }.
-      reduceByKey(_ ++ _).
-      partitionBy(partitioner).
-      persist(StorageLevel.MEMORY_AND_DISK)
+    val g = hetero match {
+      case true => loadHeteroGraph().partitionBy(partitioner).persist(StorageLevel.MEMORY_AND_DISK)
+      case false => loadHomoGraph().partitionBy(partitioner).persist(StorageLevel.MEMORY_AND_DISK)
+    }
 
     routingTable = buildRoutingTable(g).persist(StorageLevel.MEMORY_ONLY)
     routingTable.count()
@@ -52,13 +33,13 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     val lAcc = context.collectionAccumulator[Int]("links")
 
     g.foreachPartition { iter =>
-      val (r, e) = GraphMap.getGraphStatsOnlyOnce
+      val (r, e) = HGraphMap.getGraphStatsOnlyOnce
       if (r != 0) {
         rAcc.add(r)
         lAcc.add(e)
       }
       iter.foreach {
-        case (_, (neighbors: Array[(Int, Float)])) =>
+        case (_, (neighbors: Array[(Int, Float)], _)) =>
           vAccum.add(1)
           eAccum.add(neighbors.length)
       }
@@ -87,11 +68,82 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     )
   }
 
-  def buildRoutingTable(graph: RDD[(Int, Array[(Int, Float)])]): RDD[Int] = {
+  def loadHomoGraph(): RDD[(Int, (Array[(Int, Float)], Short))] = {
+    val bcDirected = context.broadcast(config.directed)
+    val bcWeighted = context.broadcast(config.weighted) // is weighted?
 
-    graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, Array[(Int, Float)])]) =>
-      iter.foreach { case (vId, neighbors) =>
-        GraphMap.addVertex(vId, neighbors)
+    context.textFile(config.input, minPartitions
+      = config
+      .rddPartitions).flatMap { triplet =>
+      val parts = triplet.split("\\s+")
+      // if the weights are not specified it sets it to 1.0
+
+      val weight = bcWeighted.value && parts.length > 2 match {
+        case true => Try(parts.last.toFloat).getOrElse(1.0f)
+        case false => 1.0f
+      }
+
+      val (src, dst) = (parts.head.toInt, parts(1).toInt)
+      if (bcDirected.value) {
+        Array((src, Array((dst, weight))), (dst, Array.empty[(Int, Float)]))
+      } else {
+        Array((src, Array((dst, weight))), (dst, Array((src, weight))))
+      }
+    }.reduceByKey(_ ++ _).map{ case (src, neighbors) =>
+      val defaultNodeType: Short = 0
+      (src, (neighbors, defaultNodeType))
+    }
+  }
+
+  def loadHeteroGraph(): RDD[(Int, (Array[(Int, Float)], Short))] = {
+    val bcDirected = context.broadcast(config.directed)
+    val bcWeighted = context.broadcast(config.weighted) // is weighted?
+
+    val edges = context.textFile(config.input, minPartitions = config.rddPartitions).flatMap {
+      triplet =>
+        val parts = triplet.split("\\s+")
+        // if the weights are not specified it sets it to 1.0
+
+        val weight = bcWeighted.value && parts.length > 2 match {
+          case true => Try(parts.last.toFloat).getOrElse(1.0f)
+          case false => 1.0f
+        }
+
+        val (src, dst) = (parts.head.toInt, parts(1).toInt)
+
+        if (bcDirected.value) {
+          //        Array((dst, (src, weight)), (None, (dst, None)))
+          Array((dst, (src, weight)))
+        } else {
+          Array((dst, (src, weight)), (src, (dst, weight)))
+        }
+      /* TODO: Check for input data correctness: e.g., no redundant edges, no bidirectional
+      representations, vertex-type exists for all vertices, and so on*/
+    }.partitionBy(partitioner)
+
+    appendNodeTypes(edges, bcDirected).reduceByKey(_ ++ _).map { case ((src, dstType), neighbors) =>
+      (src, (neighbors, dstType))
+    }
+  }
+
+  def appendNodeTypes(reversedEdges: RDD[(Int, (Int, Float))], bcDirected: Broadcast[Boolean]):
+  RDD[((Int, Short), Array[(Int, Float)])] = {
+    val vTypes = loadNodeTypes()
+    return reversedEdges.join(vTypes).flatMap { case (dst, ((src, weight), dstType)) =>
+      val v = Array(((src, dstType), Array((dst, weight))))
+      if (bcDirected.value) {
+        v ++ Array(((dst, dstType), Array.empty[(Int, Float)]))
+      } else {
+        v
+      }
+    }
+  }
+
+  def buildRoutingTable(graph: RDD[(Int, (Array[(Int, Float)], Short))]): RDD[Int] = {
+
+    graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, (Array[(Int, Float)], Short))]) =>
+      iter.foreach { case (vId, (neighbors, dstType)) =>
+        HGraphMap.getGraphMap(dstType).addVertex(vId, neighbors)
         id
       }
       Iterator.empty
@@ -100,12 +152,13 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
 
   }
 
-  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]) = {
+  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean,
+    Short))]) = {
     walkers.mapPartitions({
       iter =>
         iter.map {
-          case (_, (steps, prevNeighbors, completed)) => (steps.last, (steps, prevNeighbors,
-            completed))
+          case (_, (steps, prevNeighbors, completed, mpIndex)) => (steps.last, (steps,
+            prevNeighbors, completed, mpIndex))
         }
     }, preservesPartitioning = false)
 

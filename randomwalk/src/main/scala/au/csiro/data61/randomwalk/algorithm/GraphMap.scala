@@ -3,12 +3,11 @@ package au.csiro.data61.randomwalk.algorithm
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
-
 /**
   *
   */
 
-object GraphMap {
+case class GraphMap() {
 
   private lazy val srcVertexMap: mutable.Map[Int, Int] = new HashMap[Int, Int]()
   private lazy val offsets: ArrayBuffer[Int] = new ArrayBuffer()
@@ -16,9 +15,8 @@ object GraphMap {
   private lazy val edges: ArrayBuffer[(Int, Float)] = new ArrayBuffer()
   private var indexCounter: Int = 0
   private var offsetCounter: Int = 0
-  private var firstGet: Boolean = true
 
-  private lazy val vertexPartitionMap: mutable.Map[Int, Int] = new HashMap[Int, Int]()
+  private lazy val vertexPartitionMap: mutable.Map[Int, Int] = new HashMap()
 
   def addVertex(vId: Int, neighbors: Array[(Int, Int, Float)]): Unit = synchronized {
     srcVertexMap.get(vId) match {
@@ -55,8 +53,7 @@ object GraphMap {
     }
   }
 
-  private def updateIndices(vId:Int, outDegree:Int): Unit =
-  {
+  private def updateIndices(vId: Int, outDegree: Int): Unit = {
     srcVertexMap.put(vId, indexCounter)
     offsets.insert(indexCounter, offsetCounter)
     lengths.insert(indexCounter, outDegree)
@@ -65,19 +62,6 @@ object GraphMap {
 
   def getPartition(vId: Int): Option[Int] = {
     vertexPartitionMap.get(vId)
-  }
-
-  def getGraphStatsOnlyOnce: (Int, Int) = synchronized {
-    if (firstGet) {
-      firstGet = false
-      (srcVertexMap.size, offsetCounter)
-    }
-    else
-      (0,0)
-  }
-
-  def resetGetters {
-    firstGet = true
   }
 
   def addVertex(vId: Int): Unit = synchronized {

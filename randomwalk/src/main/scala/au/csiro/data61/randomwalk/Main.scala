@@ -19,7 +19,7 @@ object Main extends SparkJob {
     CommandParser.parse(args) match {
       case Some(params) =>
         val conf = new SparkConf().setAppName("Node2Vec")
-        if (params.useKyroSerializer) {
+        if (params.useKryoSerializer) {
           conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
           conf.set("spark.kryo.registrationRequired", "true")
           //TODO: Register the newly added classes.

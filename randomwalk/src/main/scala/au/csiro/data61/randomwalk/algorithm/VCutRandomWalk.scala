@@ -10,7 +10,7 @@ import scala.util.{Random, Try}
 case class VCutRandomWalk(context: SparkContext,
                           config: Params) extends RandomWalk {
 
-  def loadGraph(): RDD[(Int, (Array[Int]))] = {
+  def loadGraph(homo:Boolean): RDD[(Int, (Array[Int]))] = {
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
     val bcRddPartitions = context.broadcast(config.rddPartitions)
@@ -48,10 +48,11 @@ case class VCutRandomWalk(context: SparkContext,
 
     val vertexNeighbors = edgePartitions.reduceByKey((x, y) => (x._1 ++ y._1, x._2)).cache
 
-    val g: RDD[(Int, (Int, Array[(Int, Int, Float)]))] =
-      vertexPartitions.join(vertexNeighbors).map {
-        case (v, (pId, (neighbors, _))) => (pId, (v, neighbors))
-      }.partitionBy(partitioner)
+    val g: RDD[(Int, (Int, Array[(Int, Int, Float)], Short))] = null // TODO: to be implemented
+    throw new NotImplementedError("VCut for this version is not implemented yet!")
+//      vertexPartitions.join(vertexNeighbors).map {
+//        case (v, (pId, (neighbors, _))) => (pId, (v, neighbors))
+//      }.partitionBy(partitioner)
 
     routingTable = buildRoutingTable(g).persist(StorageLevel.MEMORY_ONLY)
     routingTable.count()
@@ -63,7 +64,7 @@ case class VCutRandomWalk(context: SparkContext,
     val lAcc = context.collectionAccumulator[Int]("links")
 
     vertexNeighbors.foreachPartition { iter =>
-      val (r, e) = GraphMap.getGraphStatsOnlyOnce
+      val (r, e) = HGraphMap.getGraphStatsOnlyOnce
       if (r != 0) {
         rAcc.add(r)
         lAcc.add(e)
@@ -104,12 +105,12 @@ case class VCutRandomWalk(context: SparkContext,
     }
   }
 
-  def buildRoutingTable(graph: RDD[(Int, (Int, Array[(Int, Int, Float)]))]): RDD[Int] = {
+  def buildRoutingTable(graph: RDD[(Int, (Int, Array[(Int, Int, Float)], Short))]): RDD[Int] = {
 
     graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, (Int, Array[(Int, Int,
-      Float)]))]) =>
-      iter.foreach { case (_, (vId, neighbors)) =>
-        GraphMap.addVertex(vId, neighbors)
+      Float)], Short))]) =>
+      iter.foreach { case (_, (vId, neighbors, vType)) =>
+        HGraphMap.getGraphMap(vType).addVertex(vId, neighbors)
         id
       }
       Iterator.empty
@@ -118,16 +119,17 @@ case class VCutRandomWalk(context: SparkContext,
 
   }
 
-  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]) = {
+  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean,
+    Short))]) = {
     walkers.mapPartitions({
       iter =>
         iter.map {
-          case (_, (steps, prevNeighbors, completed)) =>
-            val pId = GraphMap.getPartition(steps.last) match {
+          case (_, (steps, prevNeighbors, completed, mpIndex)) =>
+            val pId = HGraphMap.getGraphMap(mpIndex).getPartition(steps.last) match {
               case Some(pId) => pId
               case None => -1 // Must exists!
             }
-            (pId, (steps, prevNeighbors, completed))
+            (pId, (steps, prevNeighbors, completed, mpIndex))
         }
     }, preservesPartitioning = false)
 

@@ -26,6 +26,8 @@ object CommandParser {
   val ITERATION = "iter"
   val DIMENSION = "dim"
   val WINDOW = "window"
+  val VERTEX_TYPE_INPUT = "vertexTypeInput"
+  val META_PATH = "metaPath"
 
   private lazy val defaultParams = Params()
   private lazy val parser = new OptionParser[Params]("2nd Order Random Walk + Word2Vec") {
@@ -61,6 +63,13 @@ object CommandParser {
       .required()
       .text("Input edge file path: empty")
       .action((x, c) => c.copy(input = x))
+    opt[String](VERTEX_TYPE_INPUT)
+      .text("Input vertex type file path: empty")
+      .action((x, c) => c.copy(input = x))
+    opt[String](META_PATH)
+      .required()
+      .text("Meta-path (in space-separated format) for heterogeneous random walk: empty")
+      .action((x, c) => c.copy(input = x))
     opt[String](OUTPUT)
       .required()
       .text("Output path: empty")
@@ -70,8 +79,8 @@ object CommandParser {
       .text(s"command: ${defaultParams.cmd.toString}")
       .action((x, c) => c.copy(cmd = TaskName.withName(x)))
     opt[Boolean](KRYO)
-      .text(s"Whether to use kryo serializer or not: ${defaultParams.useKyroSerializer}")
-      .action((x, c) => c.copy(useKyroSerializer = x))
+      .text(s"Whether to use kryo serializer or not: ${defaultParams.useKryoSerializer}")
+      .action((x, c) => c.copy(useKryoSerializer = x))
     opt[Boolean](PARTITIONED)
       .text(s"Whether the graph is partitioned: ${defaultParams.partitioned}")
       .action((x, c) => c.copy(partitioned = x))

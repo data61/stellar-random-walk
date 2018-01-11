@@ -6,6 +6,8 @@ import org.scalatest.BeforeAndAfter
 
 class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with Serializable {
 
+  private val karate = "./randomwalk/src/test/resources/karate.txt"
+  private val testGraph = "./randomwalk/src/test/resources/testgraph.txt"
   private val master = "local[*]" // Note that you need to verify unit tests in a multi-core
   // computer.
   private val appName = "rw-unit-test"
@@ -28,7 +30,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
   }
 
   test("load graph as undirected") {
-    val config = Params(input = "./src/test/graph/karate.txt", directed = false)
+    val config = Params(input = karate, directed = false)
     val rw = VCutRandomWalk(sc, config)
     val paths = rw.loadGraph() // loadGraph(int)
     assert(rw.nEdges == 156)
@@ -46,7 +48,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
   }
 
   test("load graph as directed") {
-    val config = Params(input = "./src/test/graph/karate.txt", directed = true)
+    val config = Params(input = karate, directed = true)
     val rw = VCutRandomWalk(sc, config)
     val paths = rw.loadGraph()
     assert(rw.nEdges == 78)
@@ -64,7 +66,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
   }
 
   test("the first step of Random Walk") {
-    val config = Params(input = "./src/test/graph/testgraph.txt", directed = true)
+    val config = Params(input = testGraph, directed = true)
     val rw = VCutRandomWalk(sc, config)
     val paths = rw.loadGraph()
     val result = rw.initFirstStep(paths)
@@ -140,7 +142,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
   test("prepareWalkersToTransfer") {
 
     val pId = 0
-    val p1 = Array(1, 2,3, 4)
+    val p1 = Array(1, 2, 3, 4)
     val w1 = (pId, (p1, Array.empty[(Int, Float)], false))
     val p2 = Array(2, 5)
     val w2 = (pId, (p2, Array.empty[(Int, Float)], false))
@@ -189,7 +191,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val rValue = 0.1f
     val wLength = 1
     val nextFloatGen = () => rValue
-    val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
+    val config = Params(input = karate, directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
     val rw = VCutRandomWalk(sc, config)
     val graph = rw.loadGraph()
@@ -207,7 +209,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val rValue = 0.1f
     val nextFloatGen = () => rValue
     val wLength = 50
-    val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
+    val config = Params(input = karate, directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
     val rw = VCutRandomWalk(sc, config)
     val graph = rw.loadGraph()
@@ -224,7 +226,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
   test("test 2nd order random walk undirected3") {
     // Undirected graph
     val wLength = 50
-    val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
+    val config = Params(input = karate, directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
     val rValue = 0.9f
     val nextFloatGen = () => rValue
@@ -244,7 +246,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val rValue = 0.1f
     val nextFloatGen = () => rValue
     val wLength = 50
-    val config = Params(input = "./src/test/graph/karate.txt", directed = false, walkLength =
+    val config = Params(input = karate, directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
     val rw = VCutRandomWalk(sc, config)
     val graph = rw.loadGraph()
@@ -263,7 +265,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val nextFloatGen = () => rValue
 
     // Directed Graph
-    val config = Params(input = "./src/test/graph/karate.txt", directed = true, walkLength =
+    val config = Params(input = karate, directed = true, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
     val rw = VCutRandomWalk(sc, config)
     val graph = rw.loadGraph()
@@ -281,7 +283,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val wLength = 50
 
     // Directed Graph
-    val config = Params(input = "./src/test/graph/karate.txt", directed = true, walkLength =
+    val config = Params(input = karate, directed = true, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
     val rw = VCutRandomWalk(sc, config)
     val rValue = 0.1f

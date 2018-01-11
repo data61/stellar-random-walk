@@ -80,8 +80,8 @@ trait RandomWalk extends Serializable {
                 }
                 if (currNeighbors != null) {
                   if (currNeighbors.length > 0) {
-                    val (nextStep, _) = rSample.secondOrderSample(bcP.value.toInt, bcQ.value
-                      .toInt, prev, pNeighbors, currNeighbors)
+                    val (nextStep, _) = rSample.secondOrderSample(bcP.value.toFloat, bcQ.value
+                      .toFloat, prev, pNeighbors, currNeighbors)
                     path = path ++ Array(nextStep)
                   } else {
                     isCompleted = true
@@ -164,7 +164,8 @@ trait RandomWalk extends Serializable {
     }
   }
 
-  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]): RDD[
+  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))])
+  : RDD[
     (Int, (Array[Int], Array[(Int, Float)], Boolean))]
 
   def save(paths: RDD[Array[Int]], partitions: Int, output: String) = {

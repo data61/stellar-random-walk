@@ -27,6 +27,7 @@ object CommandParser {
   val DIMENSION = "dim"
   val WINDOW = "window"
   val VERTEX_TYPE_INPUT = "vertexTypeInput"
+  val VERTEX_TYPE_SIZE = "numberOfVertexTypes"
   val META_PATH = "metaPath"
 
   private lazy val defaultParams = Params()
@@ -65,6 +66,9 @@ object CommandParser {
       .action((x, c) => c.copy(input = x))
     opt[String](VERTEX_TYPE_INPUT)
       .text("Input vertex type file path: empty")
+      .action((x, c) => c.copy(input = x))
+    opt[String](VERTEX_TYPE_SIZE)
+      .text(s"Number of vertex types: ${defaultParams.vTypeSize}")
       .action((x, c) => c.copy(input = x))
     opt[String](META_PATH)
       .required()

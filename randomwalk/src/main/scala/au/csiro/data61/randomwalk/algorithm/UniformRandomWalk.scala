@@ -23,6 +23,9 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
       case false => loadHomoGraph().partitionBy(partitioner).persist(StorageLevel.MEMORY_AND_DISK)
     }
 
+    // the size must be compatible with the vertex type ids (from 0 to vTypeSize - 1)
+    HGraphMap.initGraphMap(config.vTypeSize)
+
     routingTable = buildRoutingTable(g).persist(StorageLevel.MEMORY_ONLY)
     routingTable.count()
 
@@ -39,9 +42,11 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
         lAcc.add(e)
       }
       iter.foreach {
-        case (_, (neighbors: Array[(Int, Float)], _)) =>
+        case (_, edgeTypes) =>
           vAccum.add(1)
-          eAccum.add(neighbors.length)
+          edgeTypes.foreach { case (neighbors: Array[(Int, Float)], _) =>
+            eAccum.add(neighbors.length)
+          }
       }
     }
     nVertices = vAccum.sum.toInt
@@ -68,7 +73,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     )
   }
 
-  def loadHomoGraph(): RDD[(Int, (Array[(Int, Float)], Short))] = {
+  def loadHomoGraph(): RDD[(Int, Array[(Array[(Int, Float)], Short)])] = {
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
 
@@ -89,13 +94,13 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
       } else {
         Array((src, Array((dst, weight))), (dst, Array((src, weight))))
       }
-    }.reduceByKey(_ ++ _).map{ case (src, neighbors) =>
+    }.reduceByKey(_ ++ _).map { case (src, neighbors) =>
       val defaultNodeType: Short = 0
-      (src, (neighbors, defaultNodeType))
+      (src, Array((neighbors, defaultNodeType)))
     }
   }
 
-  def loadHeteroGraph(): RDD[(Int, (Array[(Int, Float)], Short))] = {
+  def loadHeteroGraph(): RDD[(Int, Array[(Array[(Int, Float)], Short)])] = {
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
 
@@ -121,14 +126,15 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
       representations, vertex-type exists for all vertices, and so on*/
     }.partitionBy(partitioner)
 
-    appendNodeTypes(edges, bcDirected).reduceByKey(_ ++ _).map { case ((src, dstType), neighbors) =>
-      (src, (neighbors, dstType))
-    }
+    val vTypes = loadNodeTypes().partitionBy(partitioner).cache()
+    appendNodeTypes(edges, vTypes, bcDirected).reduceByKey(_ ++ _).map {
+      case ((src, dstType), neighbors) => (src, Array((neighbors, dstType)))
+    }.reduceByKey(_ ++ _)
   }
 
-  def appendNodeTypes(reversedEdges: RDD[(Int, (Int, Float))], bcDirected: Broadcast[Boolean]):
+  def appendNodeTypes(reversedEdges: RDD[(Int, (Int, Float))], vTypes: RDD[(Int, Short)],
+                      bcDirected: Broadcast[Boolean]):
   RDD[((Int, Short), Array[(Int, Float)])] = {
-    val vTypes = loadNodeTypes()
     return reversedEdges.join(vTypes).flatMap { case (dst, ((src, weight), dstType)) =>
       val v = Array(((src, dstType), Array((dst, weight))))
       if (bcDirected.value) {
@@ -139,11 +145,14 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     }
   }
 
-  def buildRoutingTable(graph: RDD[(Int, (Array[(Int, Float)], Short))]): RDD[Int] = {
+  def buildRoutingTable(graph: RDD[(Int, Array[(Array[(Int, Float)], Short)])]): RDD[Int] = {
 
-    graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, (Array[(Int, Float)], Short))]) =>
-      iter.foreach { case (vId, (neighbors, dstType)) =>
-        HGraphMap.getGraphMap(dstType).addVertex(vId, neighbors)
+    graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, Array[(Array[(Int, Float)],
+      Short)])]) =>
+      iter.foreach { case (vId, edgeTypes) =>
+        edgeTypes.foreach { case (neighbors, dstType) =>
+          HGraphMap.getGraphMap(dstType).addVertex(vId, neighbors)
+        }
         id
       }
       Iterator.empty

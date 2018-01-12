@@ -23,7 +23,7 @@ trait RandomWalk extends Serializable {
 
   def execute(): RDD[Array[Int]] = {
     var homo = false
-    if (config.vInput == null)
+    if (config.vTypeInput == null)
       homo = true
     randomWalk(loadGraph(homo))
   }
@@ -31,16 +31,14 @@ trait RandomWalk extends Serializable {
   def loadGraph(homogeneous: Boolean): RDD[(Int, Array[Int])]
 
   def loadNodeTypes(): RDD[(Int, Short)] = {
-    config.vInput match {
+    config.vTypeInput match {
       case null => null
       case vFile =>
         context.textFile(vFile, minPartitions = config.rddPartitions).map { line =>
           val parts = line.split("\\s+")
 
           (parts.head.toInt, parts(1).toShort)
-        }.
-          partitionBy(partitioner).
-          persist(StorageLevel.MEMORY_AND_DISK)
+        }
     }
   }
 

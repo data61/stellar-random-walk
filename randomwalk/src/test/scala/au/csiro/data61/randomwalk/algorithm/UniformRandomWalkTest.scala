@@ -290,6 +290,45 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     }
   }
 
+  test("first order walk"){
+    // Undirected graph
+    val wLength = 50
+
+    // Directed Graph
+    val config = Params(input = karate, directed = false, walkLength =
+      wLength, rddPartitions = 8, numWalks = 1)
+    val rw = UniformRandomWalk(sc, config)
+    val rValue = 0.1f
+    val nextFloatGen = () => rValue
+    val graph = rw.loadGraph()
+    val paths = rw.firstOrderWalk(graph, nextFloatGen)
+    assert(paths.count() == rw.nVertices) // a path per vertex
+    val rSampler = RandomSample(nextFloatGen)
+    paths.collect().foreach { case (p: Array[Int]) =>
+      val p2 = doFirstOrderRandomWalk(GraphMap, p(0), wLength, rSampler)
+      assert(p sameElements p2)
+    }
+  }
+
+  private def doFirstOrderRandomWalk(gMap: GraphMap.type, src: Int,
+                                      walkLength: Int, rSampler: RandomSample): Array[Int]
+  = {
+    var path = Array(src)
+
+    for (_ <- 0 until walkLength) {
+
+      val curr = path.last
+      val currNeighbors = gMap.getNeighbors(curr)
+      if (currNeighbors.length > 0) {
+        path = path ++ Array(rSampler.sample(currNeighbors)._1)
+      } else {
+        return path
+      }
+    }
+
+    path
+  }
+
   private def doSecondOrderRandomWalk(gMap: GraphMap.type, src: Int,
                                       walkLength: Int, rSampler: RandomSample, p: Float,
                                       q: Float): Array[Int]

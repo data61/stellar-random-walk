@@ -43,6 +43,48 @@ trait RandomWalk extends Serializable {
     )
   }
 
+  def firstOrderWalk(initPaths: RDD[(Int, Array[Int])], nextFloat: () => Float = Random
+    .nextFloat): RDD[Array[Int]] = {
+    val walkLength = context.broadcast(config.walkLength)
+    var totalPaths: RDD[Array[Int]] = context.emptyRDD[Array[Int]]
+
+    for (_ <- 0 until config.numWalks) {
+      val paths = initPaths.mapPartitions({ iter =>
+        iter.map { case (_, steps) =>
+          var path = steps
+          val rSample = RandomSample(nextFloat)
+          breakable {
+            while (path.length < walkLength.value + 1) {
+              val neighbors = GraphMap.getNeighbors(path.last)
+              if (neighbors != null && neighbors.length > 0) {
+                val (nextStep, _) = rSample.sample(neighbors)
+                path = path ++ Array(nextStep)
+              } else {
+                break
+              }
+            }
+          }
+          path
+        }
+      }, preservesPartitioning = true
+      ).persist(StorageLevel.MEMORY_AND_DISK)
+
+      paths.count()
+
+      val pCount = paths.count()
+      if (pCount != nVertices) {
+        println(s"Inconsistent number of paths: nPaths=[${pCount}] != vertices[$nVertices]")
+      }
+      totalPaths = totalPaths.union(paths).persist(StorageLevel
+        .MEMORY_AND_DISK)
+
+      totalPaths.count()
+
+    }
+
+    totalPaths
+  }
+
   def randomWalk(initPaths: RDD[(Int, Array[Int])], nextFloat: () => Float = Random
     .nextFloat): RDD[Array[Int]] = {
     val bcP = context.broadcast(config.p)
@@ -63,48 +105,51 @@ trait RandomWalk extends Serializable {
         unfinishedWalkers = transferWalkersToTheirPartitions(routingTable,
           prepareWalkersToTransfer(unfinishedWalkers))
 
-        unfinishedWalkers = unfinishedWalkers.mapPartitions({ iter =>
-          iter.map { case (pId, (steps: Array[Int], prevNeighbors: Array[(Int, Float)],
-          completed: Boolean)) =>
-            var path = steps
-            var isCompleted = completed
-            val rSample = RandomSample(nextFloat)
-            var pNeighbors: Array[(Int, Float)] = prevNeighbors
-            breakable {
-              while (!isCompleted && path.length != walkLength.value + 2) {
-                val currNeighbors = GraphMap.getNeighbors(path.last)
-                val prev = path(path.length - 2)
-                if (path.length > steps.length) { // If the walker is continuing on the local
-                  // partition.
-                  pNeighbors = GraphMap.getNeighbors(prev)
-                }
-                if (currNeighbors != null) {
-                  if (currNeighbors.length > 0) {
-                    val (nextStep, _) = rSample.secondOrderSample(bcP.value.toFloat, bcQ.value
-                      .toFloat, prev, pNeighbors, currNeighbors)
-                    path = path ++ Array(nextStep)
-                  } else {
-                    isCompleted = true
-                    acc2.add(1)
-                    break
-                    // This walker has reached a deadend. Needs to stop.
+        unfinishedWalkers = unfinishedWalkers.mapPartitions({
+          iter =>
+            iter.map {
+              case (pId, (steps: Array[Int], prevNeighbors: Array[(Int, Float)],
+              completed: Boolean)) =>
+                var path = steps
+                var isCompleted = completed
+                val rSample = RandomSample(nextFloat)
+                var pNeighbors: Array[(Int, Float)] = prevNeighbors
+                breakable {
+                  while (!isCompleted && path.length != walkLength.value + 2) {
+                    val currNeighbors = GraphMap.getNeighbors(path.last)
+                    val prev = path(path.length - 2)
+                    if (path.length > steps.length) {
+                      // If the walker is continuing on the local
+                      // partition.
+                      pNeighbors = GraphMap.getNeighbors(prev)
+                    }
+                    if (currNeighbors != null) {
+                      if (currNeighbors.length > 0) {
+                        val (nextStep, _) = rSample.secondOrderSample(bcP.value.toFloat, bcQ.value
+                          .toFloat, prev, pNeighbors, currNeighbors)
+                        path = path ++ Array(nextStep)
+                      } else {
+                        isCompleted = true
+                        acc2.add(1)
+                        break
+                        // This walker has reached a deadend. Needs to stop.
+                      }
+                    } else {
+                      if (path.length == steps.length) {
+                        acc.add(1)
+                      }
+                      // The walker has reached to the edge of the partition. Needs a ride to
+                      // another
+                      // partition.
+                      break
+                    }
                   }
-                } else {
-                  if (path.length == steps.length) {
-                    acc.add(1)
-                  }
-                  // The walker has reached to the edge of the partition. Needs a ride to
-                  // another
-                  // partition.
-                  break
                 }
-              }
-            }
-            if (path.length == walkLength.value + 2)
-              isCompleted = true
+                if (path.length == walkLength.value + 2)
+                  isCompleted = true
 
-            (pId, (path, pNeighbors, isCompleted))
-          }
+                (pId, (path, pNeighbors, isCompleted))
+            }
         }
           , preservesPartitioning = true
         ).persist(StorageLevel.MEMORY_AND_DISK)
@@ -124,8 +169,12 @@ trait RandomWalk extends Serializable {
         }
         println(s"Unfinished Walkers: $remainingWalkers")
         if (!acc.isZero || !acc2.isZero) {
-          println(s"Wrong Transports: ${acc.sum}")
-          println(s"Zero Neighbors: ${acc2.sum}")
+          println(s"Wrong Transports: ${
+            acc.sum
+          }")
+          println(s"Zero Neighbors: ${
+            acc2.sum
+          }")
           acc.reset()
           acc2.reset()
         }
@@ -134,7 +183,9 @@ trait RandomWalk extends Serializable {
 
       val pCount = pathsPieces.count()
       if (pCount != nVertices) {
-        println(s"Inconsistent number of paths: nPaths=[${pCount}] != vertices[$nVertices]")
+        println(s"Inconsistent number of paths: nPaths=[${
+          pCount
+        }] != vertices[$nVertices]")
       }
       totalPaths = totalPaths.union(pathsPieces).persist(StorageLevel
         .MEMORY_AND_DISK)
@@ -154,13 +205,15 @@ trait RandomWalk extends Serializable {
     }
   }
 
-  def filterUnfinishedWalkers(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]) = {
+  def filterUnfinishedWalkers(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))])
+  = {
     walkers.filter(!_._2._3)
   }
 
   def filterCompletedPaths(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]) = {
-    walkers.filter(_._2._3).map { case (_, (paths, _, _)) =>
-      paths
+    walkers.filter(_._2._3).map {
+      case (_, (paths, _, _)) =>
+        paths
     }
   }
 
@@ -174,6 +227,10 @@ trait RandomWalk extends Serializable {
       case (path) =>
         val pathString = path.mkString("\t")
         s"$pathString"
-    }.repartition(partitions).saveAsTextFile(s"${output}.${Property.pathSuffix}")
+    }.repartition(partitions).saveAsTextFile(s"${
+      output
+    }.${
+      Property.pathSuffix
+    }")
   }
 }

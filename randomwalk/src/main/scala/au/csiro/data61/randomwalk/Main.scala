@@ -51,6 +51,13 @@ object Main extends SparkJob {
     paths
   }
 
+  def doFirstOrderRandomWalk(context: SparkContext, param: Params): RDD[Array[Int]] = {
+    val rw = UniformRandomWalk(context, param)
+    val paths = rw.firstOrderWalk(rw.loadGraph())
+    rw.save(paths, param.rddPartitions, param.output)
+    paths
+  }
+
   def convertPathsToIterables(paths: RDD[Array[Int]]) = {
     paths.map { p =>
       p.map(_.toString).toList
@@ -86,8 +93,24 @@ object Main extends SparkJob {
         val word2Vec = configureWord2Vec(params)
         val model = word2Vec.fit(paths)
         saveModelAndFeatures(model, context, params)
+      case TaskName.firstorder => doFirstOrderRandomWalk(context, params)
+      case TaskName.queryPaths =>
+        val paths = context.textFile(params.input).repartition(params.rddPartitions).
+          map(_.split("\\s+"))
+        queryPaths(paths, params.edges.split("\\s+"))
+
     }
     params.output
+  }
+
+  def queryPaths(paths: RDD[Array[String]], edges: Array[String]): Array[Int] = {
+
+    val answers = new Array[Int](edges.length)
+
+    paths.collect().foreach{ case p =>
+
+    }
+
   }
 
   override def validate(sc: SparkContext, runtime: JobEnvironment, config: Config): JobData Or

@@ -6,7 +6,7 @@ object CommandParser {
 
   object TaskName extends Enumeration {
     type TaskName = Value
-    val node2vec, randomwalk, embedding = Value
+    val node2vec, randomwalk, embedding, firstorder, queryPaths = Value
   }
 
   val WALK_LENGTH = "walkLength"
@@ -26,6 +26,7 @@ object CommandParser {
   val ITERATION = "iter"
   val DIMENSION = "dim"
   val WINDOW = "window"
+  val EDGE_IDS = "edges"
 
   private lazy val defaultParams = Params()
   private lazy val parser = new OptionParser[Params]("2nd Order Random Walk + Word2Vec") {
@@ -64,6 +65,10 @@ object CommandParser {
     opt[String](OUTPUT)
       .required()
       .text("Output path: empty")
+      .action((x, c) => c.copy(output = x))
+    opt[String](EDGE_IDS)
+      .required()
+      .text("Edge IDs to query from the paths: empty")
       .action((x, c) => c.copy(output = x))
     opt[String](CMD)
       .required()

@@ -72,7 +72,7 @@ object CommandParser {
       .action((x, c) => c.copy(input = x))
     opt[String](META_PATH)
       .required()
-      .text("Meta-path (in space-separated format) for heterogeneous random walk: empty")
+      .text(s"Meta-path (in space-separated format) for heterogeneous random walk: ${defaultParams.metaPath}")
       .action((x, c) => c.copy(input = x))
     opt[String](OUTPUT)
       .required()

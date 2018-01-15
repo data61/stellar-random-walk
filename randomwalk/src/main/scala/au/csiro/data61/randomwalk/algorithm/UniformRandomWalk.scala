@@ -15,7 +15,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     *
     * @return
     */
-  def loadGraph(hetero: Boolean): RDD[(Int, Array[Int])] = {
+  def loadGraph(hetero: Boolean, bcMetapath: Broadcast[Array[Short]]): RDD[(Int, Array[Int])] = {
     // the directed and weighted parameters are only used for building the graph object.
     // is directed? they will be shared among stages and executors
     val g = hetero match {
@@ -42,7 +42,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
         lAcc.add(e)
       }
       iter.foreach {
-        case (_, edgeTypes) =>
+        case (_, (edgeTypes, _)) =>
           vAccum.add(1)
           edgeTypes.foreach { case (neighbors: Array[(Int, Float)], _) =>
             eAccum.add(neighbors.length)
@@ -64,7 +64,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     println(s"E Partitions: $ePartitions")
     println(s"V Partitions: $vPartitions")
 
-    g.mapPartitions({ iter =>
+    g.filter(v => v._2._2 == bcMetapath.value(0)).mapPartitions({ iter =>
       iter.map {
         case (vId: Int, _) =>
           (vId, Array(vId))
@@ -73,7 +73,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     )
   }
 
-  def loadHomoGraph(): RDD[(Int, Array[(Array[(Int, Float)], Short)])] = {
+  def loadHomoGraph(): RDD[(Int, (Array[(Array[(Int, Float)], Short)], Short))] = {
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
 
@@ -96,11 +96,11 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
       }
     }.reduceByKey(_ ++ _).map { case (src, neighbors) =>
       val defaultNodeType: Short = 0
-      (src, Array((neighbors, defaultNodeType)))
+      (src, (Array((neighbors, defaultNodeType)), defaultNodeType))
     }
   }
 
-  def loadHeteroGraph(): RDD[(Int, Array[(Array[(Int, Float)], Short)])] = {
+  def loadHeteroGraph(): RDD[(Int, (Array[(Array[(Int, Float)], Short)], Short))] = {
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
 
@@ -129,7 +129,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     val vTypes = loadNodeTypes().partitionBy(partitioner).cache()
     appendNodeTypes(edges, vTypes, bcDirected).reduceByKey(_ ++ _).map {
       case ((src, dstType), neighbors) => (src, Array((neighbors, dstType)))
-    }.reduceByKey(_ ++ _)
+    }.reduceByKey(_ ++ _).join(vTypes, partitioner)
   }
 
   def appendNodeTypes(reversedEdges: RDD[(Int, (Int, Float))], vTypes: RDD[(Int, Short)],
@@ -145,11 +145,12 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     }
   }
 
-  def buildRoutingTable(graph: RDD[(Int, Array[(Array[(Int, Float)], Short)])]): RDD[Int] = {
+  def buildRoutingTable(graph: RDD[(Int, (Array[(Array[(Int, Float)], Short)], Short))])
+  : RDD[Int] = {
 
-    graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, Array[(Array[(Int, Float)],
-      Short)])]) =>
-      iter.foreach { case (vId, edgeTypes) =>
+    graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, (Array[(Array[(Int, Float)],
+      Short)], Short))]) =>
+      iter.foreach { case (vId, (edgeTypes, _)) =>
         edgeTypes.foreach { case (neighbors, dstType) =>
           HGraphMap.getGraphMap(dstType).addVertex(vId, neighbors)
         }

@@ -31,7 +31,8 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
   test("load graph as undirected") {
     val config = Params(input = karate, directed = false)
     val rw = VCutRandomWalk(sc, config)
-    val paths = rw.loadGraph(false) // loadGraph(int)
+    val metaPath: Array[Short] = Array(0, 0)
+    val paths = rw.loadGraph(hetero = false, sc.broadcast(metaPath))
     assert(rw.nEdges == 156)
     assert(rw.nVertices == 34)
     assert(paths.count() == 34)
@@ -49,7 +50,8 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
   test("load graph as directed") {
     val config = Params(input = karate, directed = true)
     val rw = VCutRandomWalk(sc, config)
-    val paths = rw.loadGraph(false)
+    val metaPath: Array[Short] = Array(0, 0)
+    val paths = rw.loadGraph(hetero = false, sc.broadcast(metaPath))
     assert(rw.nEdges == 78)
     assert(rw.nVertices == 34)
     assert(paths.count() == 34)
@@ -67,8 +69,10 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
   test("the first step of Random Walk") {
     val config = Params(input = testGraph, directed = true)
     val rw = VCutRandomWalk(sc, config)
-    val paths = rw.loadGraph(false)
-    val result = rw.initFirstStep(paths)
+    val metaPath: Array[Short] = Array(0, 0)
+    val paths = rw.loadGraph(hetero = false, sc.broadcast(metaPath))
+
+    val result = rw.initFirstStep(paths, bcMetapath = sc.broadcast(rw.metaPath))
     assert(result.count == paths.count())
     for (t <- result.collect()) {
       val p = t._2._1
@@ -196,8 +200,9 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val config = Params(input = karate, directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
     val rw = VCutRandomWalk(sc, config)
-    val graph = rw.loadGraph(false)
-    val paths = rw.randomWalk(graph, nextFloatGen)
+    val metaPath: Array[Short] = Array(0, 0)
+    val graph = rw.loadGraph(hetero = false, sc.broadcast(metaPath))
+    val paths = rw.randomWalk(graph, nextFloatGen, sc.broadcast(rw.metaPath))
     val rSampler = RandomSample(nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     paths.collect().foreach { case (p: Array[Int]) =>
@@ -215,8 +220,9 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val config = Params(input = karate, directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
     val rw = VCutRandomWalk(sc, config)
-    val graph = rw.loadGraph(false)
-    val paths = rw.randomWalk(graph, nextFloatGen)
+    val metaPath: Array[Short] = Array(0, 0)
+    val graph = rw.loadGraph(hetero = false, sc.broadcast(metaPath))
+    val paths = rw.randomWalk(graph, nextFloatGen, sc.broadcast(rw.metaPath))
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
@@ -235,8 +241,9 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val rValue = 0.9f
     val nextFloatGen = () => rValue
     val rw = VCutRandomWalk(sc, config)
-    val graph = rw.loadGraph(false)
-    val paths = rw.randomWalk(graph, nextFloatGen)
+    val metaPath: Array[Short] = Array(0, 0)
+    val graph = rw.loadGraph(hetero = false, sc.broadcast(metaPath))
+    val paths = rw.randomWalk(graph, nextFloatGen, sc.broadcast(rw.metaPath))
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
@@ -254,8 +261,9 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val config = Params(input = karate, directed = false, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
     val rw = VCutRandomWalk(sc, config)
-    val graph = rw.loadGraph(false)
-    val paths = rw.randomWalk(graph, nextFloatGen)
+    val metaPath: Array[Short] = Array(0, 0)
+    val graph = rw.loadGraph(hetero = false, sc.broadcast(metaPath))
+    val paths = rw.randomWalk(graph, nextFloatGen, sc.broadcast(rw.metaPath))
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
@@ -274,8 +282,9 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val config = Params(input = karate, directed = true, walkLength =
       wLength, rddPartitions = 8, numWalks = 1)
     val rw = VCutRandomWalk(sc, config)
-    val graph = rw.loadGraph(false)
-    val paths = rw.randomWalk(graph, nextFloatGen)
+    val metaPath: Array[Short] = Array(0, 0)
+    val graph = rw.loadGraph(hetero = false, sc.broadcast(metaPath))
+    val paths = rw.randomWalk(graph, nextFloatGen, sc.broadcast(rw.metaPath))
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
@@ -295,8 +304,9 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val rw = VCutRandomWalk(sc, config)
     val rValue = 0.1f
     val nextFloatGen = () => rValue
-    val graph = rw.loadGraph(false)
-    val paths = rw.randomWalk(graph, nextFloatGen)
+    val metaPath: Array[Short] = Array(0, 0)
+    val graph = rw.loadGraph(hetero = false, sc.broadcast(metaPath))
+    val paths = rw.randomWalk(graph, nextFloatGen, sc.broadcast(rw.metaPath))
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>

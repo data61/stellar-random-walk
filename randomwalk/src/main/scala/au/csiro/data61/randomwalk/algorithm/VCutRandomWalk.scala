@@ -2,6 +2,7 @@ package au.csiro.data61.randomwalk.algorithm
 
 import au.csiro.data61.randomwalk.common.Params
 import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
@@ -10,7 +11,7 @@ import scala.util.{Random, Try}
 case class VCutRandomWalk(context: SparkContext,
                           config: Params) extends RandomWalk {
 
-  def loadGraph(homo:Boolean): RDD[(Int, (Array[Int]))] = {
+  def loadGraph(hetero:Boolean, bcMetapath:Broadcast[Array[Short]]): RDD[(Int, (Array[Int]))] = {
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
     val bcRddPartitions = context.broadcast(config.rddPartitions)

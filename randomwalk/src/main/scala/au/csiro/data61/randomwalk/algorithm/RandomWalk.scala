@@ -19,16 +19,18 @@ trait RandomWalk extends Serializable {
   lazy val logger = LogManager.getLogger("rwLogger")
   var nVertices: Int = 0
   var nEdges: Int = 0
+  lazy val metaPath: Array[Short] = config.metaPath.split("\\s+").map(t => t.toShort)
 
 
   def execute(): RDD[Array[Int]] = {
     var homo = false
     if (config.vTypeInput == null)
       homo = true
-    randomWalk(loadGraph(homo))
+    val bcmp = context.broadcast(metaPath)
+    randomWalk(loadGraph(homo, bcmp), bcMetapath = bcmp)
   }
 
-  def loadGraph(homogeneous: Boolean): RDD[(Int, Array[Int])]
+  def loadGraph(homogeneous: Boolean, bcMetapath: Broadcast[Array[Short]]): RDD[(Int, Array[Int])]
 
   def loadNodeTypes(): RDD[(Int, Short)] = {
     config.vTypeInput match {
@@ -43,11 +45,11 @@ trait RandomWalk extends Serializable {
   }
 
   def initFirstStep(paths: RDD[(Int, Array[Int])], nextFloat: () =>
-    Float = Random.nextFloat, bcMetapath: Broadcast[Array[Short]] = context.broadcast(Array(0)))
+    Float = Random.nextFloat, bcMetapath: Broadcast[Array[Short]])
   : RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean, Short))] = {
     paths.mapPartitions({ iter =>
       val mp = bcMetapath.value
-      val mpIndex: Short = (1 % mp.length).toShort
+      val mpIndex: Short = 1
       val nextMpIndex: Short = ((mpIndex + 1) % mp.length).toShort
       iter.map { case (pId, path: Array[Int]) =>
         // metapath index is 1 in the first step
@@ -65,7 +67,7 @@ trait RandomWalk extends Serializable {
   }
 
   def randomWalk(initPaths: RDD[(Int, Array[Int])], nextFloat: () => Float = Random
-    .nextFloat, bcMetapath: Broadcast[Array[Short]] = context.broadcast(Array(0)))
+    .nextFloat, bcMetapath: Broadcast[Array[Short]])
   : RDD[Array[Int]] = {
     val bcP = context.broadcast(config.p)
     val bcQ = context.broadcast(config.q)
@@ -74,7 +76,7 @@ trait RandomWalk extends Serializable {
 
     for (_ <- 0 until config.numWalks) {
       var unfinishedWalkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean, Short))] =
-        initFirstStep(initPaths, nextFloat)
+        initFirstStep(initPaths, nextFloat, bcMetapath)
       var pathsPieces: RDD[Array[Int]] = context.emptyRDD[Array[Int]].repartition(config
         .rddPartitions)
       var remainingWalkers = Int.MaxValue

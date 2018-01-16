@@ -35,7 +35,7 @@ object Main extends SparkJob {
   private def saveModelAndFeatures(model: Word2VecModel, context: SparkContext, config: Params)
   : Unit = {
     model.save(context, s"${config.output}.${Property.modelSuffix}")
-    context.parallelize(model.getVectors.toList, config.w2vPartitions).map { case (nodeId,
+    context.parallelize(model.getVectors.toList, config.rddPartitions).map { case (nodeId,
     vector) =>
       s"$nodeId\t${vector.mkString(",")}"
     }.saveAsTextFile(s"${config.output}.${Property.vectorSuffix}")

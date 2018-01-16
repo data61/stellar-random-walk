@@ -19,18 +19,23 @@ trait RandomWalk extends Serializable {
   lazy val logger = LogManager.getLogger("rwLogger")
   var nVertices: Int = 0
   var nEdges: Int = 0
-  lazy val metaPath: Array[Short] = config.metaPath.split("\\s+").map(t => t.toShort)
-
-
-  def execute(): RDD[Array[Int]] = {
-    var homo = false
-    if (config.vTypeInput == null)
-      homo = true
-    val bcmp = context.broadcast(metaPath)
-    randomWalk(loadGraph(homo, bcmp), bcMetapath = bcmp)
+  lazy val metaPath: Array[Short] = {
+    val mp = config.metaPath.split("\\s+").map(t => t.toShort)
+    if (mp.length == 1)
+      mp ++ mp // If the input is a metapath with single type, it converts it to Array(t, t).
+    else
+      mp
   }
 
-  def loadGraph(homogeneous: Boolean, bcMetapath: Broadcast[Array[Short]]): RDD[(Int, Array[Int])]
+  def execute(): RDD[Array[Int]] = {
+    var hetero = true
+    if (config.vTypeInput == null)
+      hetero = false
+    val bcmp = context.broadcast(metaPath)
+    randomWalk(loadGraph(hetero, bcmp), bcMetapath = bcmp)
+  }
+
+  def loadGraph(heterogeneous: Boolean, bcMetapath: Broadcast[Array[Short]]): RDD[(Int, Array[Int])]
 
   def loadNodeTypes(): RDD[(Int, Short)] = {
     config.vTypeInput match {

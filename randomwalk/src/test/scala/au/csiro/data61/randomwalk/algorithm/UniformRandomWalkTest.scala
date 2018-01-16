@@ -35,8 +35,8 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val types = Array("0", "1", "2")
     val defaultMp = Array(types(0).toShort, types(0).toShort)
     assert(defaultMp sameElements UniformRandomWalk(sc, Params()).metaPath)
-    val mp = Array(types(0).toShort, types(1).toShort, types(2).toShort, types(0).toShort)
-    assert(mp sameElements UniformRandomWalk(sc, Params(metaPath = "0 1 2 0")).metaPath)
+    val mp = Array(types(0).toShort, types(1).toShort, types(2).toShort)
+    assert(mp sameElements UniformRandomWalk(sc, Params(metaPath = "0 1 2")).metaPath)
   }
 
   test("load node types") {
@@ -273,6 +273,36 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     assert(filteredWalkers.filter(_._1 == p3._1).length == 1)
 
   }
+
+  test("heterogeneous walk") {
+    val typeSize: Short = 3
+    var config: Params = Params(input = karate, vTypeInput = karateNodeTypes, vTypeSize = typeSize,
+      metaPath = "0 1 2 1", directed = false, numWalks = 1)
+    var rw = UniformRandomWalk(sc, config)
+    var paths = rw.execute()
+    assert(paths.count() == 12) // only paths starting from vertex-type 0.
+    var mpLength = rw.metaPath.length
+    var metaPath = rw.metaPath
+    assert(paths.collect().forall { p =>
+      p.view.zipWithIndex.forall { case (v, i) =>
+        metaPath(i % mpLength) == (v - 1) % typeSize
+      }
+    })
+
+    config = Params(input = karate, vTypeInput = karateNodeTypes, vTypeSize = typeSize,
+      metaPath = "0", directed = false, numWalks = 1)
+    rw = UniformRandomWalk(sc, config)
+    paths = rw.execute()
+    assert(paths.count() == 12) // only paths starting from vertex-type 0.
+    mpLength = rw.metaPath.length
+    metaPath = rw.metaPath
+    assert(paths.collect().forall { p =>
+      p.view.zipWithIndex.forall { case (v, i) =>
+        metaPath(i % mpLength) == (v - 1) % typeSize
+      }
+    })
+  }
+
 
   test("test 2nd order random walk undirected1") {
     // Undirected graph

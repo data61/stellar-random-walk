@@ -7,6 +7,11 @@
   <version>0.0.1-SNAPSHOT</version>
   <url>https://github.com/data61/stellar-random-walk</url>
   <build>
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+    </testResources>
     <plugins>
       <plugin>
         <groupId>org.scala-tools</groupId>

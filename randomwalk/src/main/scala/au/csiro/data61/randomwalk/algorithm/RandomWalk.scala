@@ -167,10 +167,6 @@ trait RandomWalk extends Serializable {
       }
       while (remainingWalkers != 0)
 
-      val pCount = pathsPieces.count()
-      if (pCount != nVertices) {
-        println(s"Inconsistent number of paths: nPaths=[${pCount}] != vertices[$nVertices]")
-      }
       totalPaths = totalPaths.union(pathsPieces).persist(StorageLevel
         .MEMORY_AND_DISK)
 

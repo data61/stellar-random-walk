@@ -20,7 +20,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     // hostname"
     // If this test is running in MacOS and without Internet connection.
     // https://issues.apache.org/jira/browse/SPARK-19394
-    HGraphMap.initGraphMap(1)
+    HGraphMap.initGraphMap(3)
     val conf = new SparkConf().setMaster(master).setAppName(appName)
     sc = SparkContext.getOrCreate(conf)
   }
@@ -29,6 +29,7 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     if (sc != null) {
       sc.stop()
     }
+    HGraphMap.reset
   }
 
   test("metapath input") {

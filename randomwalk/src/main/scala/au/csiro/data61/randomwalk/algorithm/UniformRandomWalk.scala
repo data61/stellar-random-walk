@@ -23,9 +23,6 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
       case false => loadHomoGraph().partitionBy(partitioner).persist(StorageLevel.MEMORY_AND_DISK)
     }
 
-    // the size must be compatible with the vertex type ids (from 0 to vTypeSize - 1)
-    HGraphMap.initGraphMap(config.vTypeSize)
-
     routingTable = buildRoutingTable(g).persist(StorageLevel.MEMORY_ONLY)
     routingTable.count()
 
@@ -148,8 +145,12 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
   def buildRoutingTable(graph: RDD[(Int, (Array[(Array[(Int, Float)], Short)], Short))])
   : RDD[Int] = {
 
+    // the size must be compatible with the vertex type ids (from 0 to vTypeSize - 1)
+    val bcTypeSize = context.broadcast(config.vTypeSize)
+
     graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, (Array[(Array[(Int, Float)],
       Short)], Short))]) =>
+      HGraphMap.initGraphMap(bcTypeSize.value)
       iter.foreach { case (vId, (edgeTypes, _)) =>
         edgeTypes.foreach { case (neighbors, dstType) =>
           HGraphMap.addVertex(dstType, vId, neighbors)

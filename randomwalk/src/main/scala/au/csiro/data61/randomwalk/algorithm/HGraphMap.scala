@@ -4,14 +4,17 @@ import scala.collection.mutable
 
 object HGraphMap {
   private var firstGet: Boolean = true
+  private var initialized = false
   private val vertices = new mutable.HashSet[Int]()
 
   var hGraph: Array[GraphMap] = null
 
-  def initGraphMap(numVertexTypes: Int): HGraphMap.type = {
-    vertices.clear()
-    hGraph = new Array[GraphMap](numVertexTypes).map(_ => GraphMap())
-    this
+  def initGraphMap(numVertexTypes: Int) = synchronized {
+    if (!initialized) {
+      vertices.clear()
+      hGraph = new Array[GraphMap](numVertexTypes).map(_ => GraphMap())
+      initialized = true
+    }
   }
 
   def addVertex(dstType: Short, vId: Int, neighbors: Array[(Int, Float)]): Unit = synchronized {
@@ -67,5 +70,12 @@ object HGraphMap {
 
   def resetGetters {
     firstGet = true
+  }
+
+  def reset = synchronized {
+    initialized = false
+    firstGet = false
+    vertices.clear()
+    hGraph = null
   }
 }

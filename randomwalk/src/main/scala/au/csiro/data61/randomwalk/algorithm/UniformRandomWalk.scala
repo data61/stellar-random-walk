@@ -152,7 +152,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
       Short)], Short))]) =>
       iter.foreach { case (vId, (edgeTypes, _)) =>
         edgeTypes.foreach { case (neighbors, dstType) =>
-          HGraphMap.getGraphMap(dstType).addVertex(vId, neighbors)
+          HGraphMap.addVertex(dstType, vId, neighbors)
         }
         id
       }

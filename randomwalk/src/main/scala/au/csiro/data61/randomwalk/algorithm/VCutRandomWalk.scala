@@ -110,8 +110,8 @@ case class VCutRandomWalk(context: SparkContext,
 
     graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, (Int, Array[(Int, Int,
       Float)], Short))]) =>
-      iter.foreach { case (_, (vId, neighbors, vType)) =>
-        HGraphMap.getGraphMap(vType).addVertex(vId, neighbors)
+      iter.foreach { case (_, (vId, neighbors, dstType)) =>
+        HGraphMap.addVertex(dstType, vId, neighbors)
         id
       }
       Iterator.empty
@@ -126,7 +126,7 @@ case class VCutRandomWalk(context: SparkContext,
       iter =>
         iter.map {
           case (_, (steps, prevNeighbors, completed, mpIndex)) =>
-            val pId = HGraphMap.getGraphMap(mpIndex).getPartition(steps.last) match {
+            val pId = HGraphMap.getPartition(mpIndex, steps.last) match {
               case Some(pId) => pId
               case None => -1 // Must exists!
             }

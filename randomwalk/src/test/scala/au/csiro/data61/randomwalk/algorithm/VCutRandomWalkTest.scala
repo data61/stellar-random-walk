@@ -39,8 +39,8 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val vAcc = sc.longAccumulator("v")
     val eAcc = sc.longAccumulator("e")
     paths.coalesce(1).mapPartitions { iter =>
-      vAcc.add(HGraphMap.getGraphMap(0).getNumVertices)
-      eAcc.add(HGraphMap.getGraphMap(0).getNumEdges)
+      vAcc.add(HGraphMap.getNumVertices(0))
+      eAcc.add(HGraphMap.getNumEdges(0))
       iter
     }.first()
     assert(eAcc.sum == 156)
@@ -58,8 +58,8 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val vAcc = sc.longAccumulator("v")
     val eAcc = sc.longAccumulator("e")
     paths.coalesce(1).mapPartitions { iter =>
-      vAcc.add(HGraphMap.getGraphMap(0).getNumVertices)
-      eAcc.add(HGraphMap.getGraphMap(0).getNumEdges)
+      vAcc.add(HGraphMap.getNumVertices(0))
+      eAcc.add(HGraphMap.getNumEdges(0))
       iter
     }.first()
     assert(eAcc.sum == 78)
@@ -206,7 +206,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     val rSampler = RandomSample(nextFloatGen)
     assert(paths.count() == rw.nVertices) // a path per vertex
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(HGraphMap.getGraphMap(0), p(0), wLength, rSampler, 1.0f,
+      val p2 = TestUtils.doSecondOrderRandomWalk(p(0), wLength, rSampler, 1.0f,
         1.0f)
       assert(p sameElements p2)
     }
@@ -226,7 +226,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(HGraphMap.getGraphMap(0), p(0), wLength, rSampler, 1.0f,
+      val p2 = TestUtils.doSecondOrderRandomWalk(p(0), wLength, rSampler, 1.0f,
         1.0f)
       assert(p sameElements p2)
 
@@ -247,7 +247,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(HGraphMap.getGraphMap(0), p(0), wLength, rSampler, 1.0f,
+      val p2 = TestUtils.doSecondOrderRandomWalk(p(0), wLength, rSampler, 1.0f,
         1.0f)
       assert(p sameElements p2)
     }
@@ -267,7 +267,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(HGraphMap.getGraphMap(0), p(0), wLength, rSampler, 1.0f,
+      val p2 = TestUtils.doSecondOrderRandomWalk(p(0), wLength, rSampler, 1.0f,
         1.0f)
       assert(p sameElements p2)
     }
@@ -288,7 +288,7 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(HGraphMap.getGraphMap(0), p(0), wLength, rSampler, 1.0f,
+      val p2 = TestUtils.doSecondOrderRandomWalk(p(0), wLength, rSampler, 1.0f,
         1.0f)
       assert(p sameElements p2)
     }
@@ -310,40 +310,11 @@ class VCutRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter with
     assert(paths.count() == rw.nVertices) // a path per vertex
     val rSampler = RandomSample(nextFloatGen)
     paths.collect().foreach { case (p: Array[Int]) =>
-      val p2 = doSecondOrderRandomWalk(HGraphMap.getGraphMap(0), p(0), wLength, rSampler, 1.0f,
+      val p2 = TestUtils.doSecondOrderRandomWalk(p(0), wLength, rSampler, 1.0f,
         1.0f)
       assert(p sameElements p2)
     }
   }
 
-  private def doSecondOrderRandomWalk(gMap: GraphMap, src: Int,
-                                      walkLength: Int, rSampler: RandomSample, p: Float,
-                                      q: Float): Array[Int]
-  = {
-    var path = Array(src)
-    val neighbors = gMap.getNeighbors(src)
-    if (neighbors.length > 0) {
-      path = path ++ Array(rSampler.sample(neighbors)._1)
-    }
-    else {
-      return path
-    }
-
-    for (_ <- 0 until walkLength) {
-
-      val curr = path.last
-      val prev = path(path.length - 2)
-      val currNeighbors = gMap.getNeighbors(curr)
-      if (currNeighbors.length > 0) {
-        val prevNeighbors = gMap.getNeighbors(prev)
-        path = path ++ Array(rSampler.secondOrderSample(p, q, prev, prevNeighbors, currNeighbors)
-          ._1)
-      } else {
-        return path
-      }
-    }
-
-    path
-  }
 
 }

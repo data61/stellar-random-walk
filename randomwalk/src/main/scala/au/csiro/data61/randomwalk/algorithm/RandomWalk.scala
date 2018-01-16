@@ -105,10 +105,11 @@ trait RandomWalk extends Serializable {
                   // partition.
                   pNeighbors = currNeighbors
                 }
-                currNeighbors = HGraphMap.getNeighbors(path.last, mp(mpi))
-                mpi = ((mpi + 1) % mp.length).toShort
-                if (currNeighbors != null) {
-                  if (currNeighbors.length > 0) {
+                val curr = path.last
+                if (HGraphMap.exists(curr)) {
+                  currNeighbors = HGraphMap.getNeighbors(curr, mp(mpi))
+                  mpi = ((mpi + 1) % mp.length).toShort
+                  if (currNeighbors != null && currNeighbors.length > 0) {
                     val (nextStep, _) = rSample.secondOrderSample(bcP.value.toFloat, bcQ.value
                       .toFloat, path(path.length - 2), pNeighbors, currNeighbors)
                     path = path ++ Array(nextStep)

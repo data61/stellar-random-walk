@@ -81,7 +81,7 @@ object Main extends SparkJob {
         saveModelAndFeatures(model, context, params)
       case TaskName.randomwalk => doRandomWalk(context, params)
       case TaskName.embedding =>
-        val paths = context.textFile(params.input).repartition(params.w2vPartitions).
+        val paths = context.textFile(params.input).repartition(params.rddPartitions).
           map(_.split("\\s+").toSeq)
         val word2Vec = configureWord2Vec(params)
         val model = word2Vec.fit(paths)

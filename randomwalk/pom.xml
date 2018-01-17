@@ -24,11 +24,6 @@
 
     <repositories>
         <repository>
-            <id>spark-jobserver-repo</id>
-            <name>SparkJobServer Repository</name>
-            <url>https://dl.bintray.com/spark-jobserver/maven/</url>
-        </repository>
-        <repository>
             <id>central-maven</id>
             <name>Central Repository</name>
             <url>http://central.maven.org/maven2/</url>
@@ -149,12 +144,6 @@
             <artifactId>scalatest_2.11</artifactId>
             <version>3.0.4</version>
             <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>spark.jobserver</groupId>
-            <artifactId>job-server-api_2.11</artifactId>
-            <version>0.8.0</version>
-            <!--<scope>provided</scope>-->
         </dependency>
     </dependencies>
 

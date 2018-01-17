@@ -1,13 +1,25 @@
 package au.csiro.data61.randomwalk.algorithm
 
-import au.csiro.data61.randomwalk.common.Params
-import org.apache.spark.SparkContext
+import au.csiro.data61.randomwalk.common.{Params, Property}
+import org.apache.log4j.LogManager
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.{HashPartitioner, SparkContext}
 
-import scala.util.Try
+import scala.util.control.Breaks.{break, breakable}
+import scala.util.{Random, Try}
 
-case class UniformRandomWalk(context: SparkContext, config: Params) extends RandomWalk {
+case class UniformRandomWalk(context: SparkContext, config: Params) extends Serializable {
+
+  lazy val partitioner: HashPartitioner = new HashPartitioner(config.rddPartitions)
+  var routingTable: RDD[Int] = _
+  lazy val logger = LogManager.getLogger("rwLogger")
+  var nVertices: Int = 0
+  var nEdges: Int = 0
+
+  def execute(): RDD[Array[Int]] = {
+    firstOrderWalk(loadGraph())
+  }
 
   /**
     * Loads the graph and computes the probabilities to go from each vertex to its neighbors
@@ -87,6 +99,48 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     )
   }
 
+  def firstOrderWalk(initPaths: RDD[(Int, Array[Int])], nextFloat: () => Float = Random
+    .nextFloat): RDD[Array[Int]] = {
+    val walkLength = context.broadcast(config.walkLength)
+    var totalPaths: RDD[Array[Int]] = context.emptyRDD[Array[Int]]
+
+    for (_ <- 0 until config.numWalks) {
+      val paths = initPaths.mapPartitions({ iter =>
+        iter.map { case (_, steps) =>
+          var path = steps
+          val rSample = RandomSample(nextFloat)
+          breakable {
+            while (path.length < walkLength.value + 1) {
+              val neighbors = GraphMap.getNeighbors(path.last)
+              if (neighbors != null && neighbors.length > 0) {
+                val (nextStep, _) = rSample.sample(neighbors)
+                path = path ++ Array(nextStep)
+              } else {
+                break
+              }
+            }
+          }
+          path
+        }
+      }, preservesPartitioning = true
+      ).persist(StorageLevel.MEMORY_AND_DISK)
+
+      paths.count()
+
+      val pCount = paths.count()
+      if (pCount != nVertices) {
+        println(s"Inconsistent number of paths: nPaths=[${pCount}] != vertices[$nVertices]")
+      }
+      totalPaths = totalPaths.union(paths).persist(StorageLevel
+        .MEMORY_AND_DISK)
+
+      totalPaths.count()
+
+    }
+
+    totalPaths
+  }
+
   def buildRoutingTable(graph: RDD[(Int, Array[(Int, Float)])]): RDD[Int] = {
 
     graph.mapPartitionsWithIndex({ (id: Int, iter: Iterator[(Int, Array[(Int, Float)])]) =>
@@ -100,15 +154,34 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
 
   }
 
-  def prepareWalkersToTransfer(walkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))]) = {
-    walkers.mapPartitions({
-      iter =>
-        iter.map {
-          case (_, (steps, prevNeighbors, completed)) => (steps.last, (steps, prevNeighbors,
-            completed))
-        }
-    }, preservesPartitioning = false)
+  def save(paths: RDD[Array[Int]]): RDD[Array[Int]] = {
 
+    paths.map {
+      case (path) =>
+        val pathString = path.mkString("\t")
+        s"$pathString"
+    }.repartition(config.rddPartitions).saveAsTextFile(s"${config.output}.${Property.pathSuffix}")
+    paths
+  }
+
+  def queryPaths(paths: RDD[Array[Int]]): Array[(Int, (Int, Int))] = {
+    val nodes = config.nodes.split("\\s+").map(s => s.toInt)
+    val numOccurrences = new Array[(Int, (Int, Int))](nodes.length)
+
+    for (i <- 0 until nodes.length) {
+      val bcNode = context.broadcast(nodes(i))
+      numOccurrences(i) = (nodes(i),
+        paths.mapPartitions { iter =>
+          val targetNode = bcNode.value
+          iter.map { case steps =>
+            val counts = steps.count(s => s == targetNode)
+            val occurs = if (counts > 0) 1 else 0
+            (counts, occurs)
+          }
+        }.reduce((c, o) => (c._1 + o._1, c._2 + o._2)))
+    }
+
+    numOccurrences
   }
 
 }

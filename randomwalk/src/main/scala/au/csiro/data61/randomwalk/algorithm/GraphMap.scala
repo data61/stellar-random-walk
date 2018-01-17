@@ -18,25 +18,6 @@ object GraphMap {
   private var offsetCounter: Int = 0
   private var firstGet: Boolean = true
 
-  private lazy val vertexPartitionMap: mutable.Map[Int, Int] = new HashMap[Int, Int]()
-
-  def addVertex(vId: Int, neighbors: Array[(Int, Int, Float)]): Unit = synchronized {
-    srcVertexMap.get(vId) match {
-      case None => {
-        if (!neighbors.isEmpty) {
-          updateIndices(vId, neighbors.length)
-          for ((dst, pId, weight) <- neighbors) {
-            edges.insert(offsetCounter, (dst, weight))
-            offsetCounter += 1
-            vertexPartitionMap.put(dst, pId)
-          }
-        } else {
-          this.addVertex(vId)
-        }
-      }
-      case Some(value) => value
-    }
-  }
 
   def addVertex(vId: Int, neighbors: Array[(Int, Float)]): Unit = synchronized {
     srcVertexMap.get(vId) match {
@@ -55,16 +36,11 @@ object GraphMap {
     }
   }
 
-  private def updateIndices(vId:Int, outDegree:Int): Unit =
-  {
+  private def updateIndices(vId: Int, outDegree: Int): Unit = {
     srcVertexMap.put(vId, indexCounter)
     offsets.insert(indexCounter, offsetCounter)
     lengths.insert(indexCounter, outDegree)
     indexCounter += 1
-  }
-
-  def getPartition(vId: Int): Option[Int] = {
-    vertexPartitionMap.get(vId)
   }
 
   def getGraphStatsOnlyOnce: (Int, Int) = synchronized {
@@ -73,7 +49,7 @@ object GraphMap {
       (srcVertexMap.size, offsetCounter)
     }
     else
-      (0,0)
+      (0, 0)
   }
 
   def resetGetters {
@@ -103,7 +79,6 @@ object GraphMap {
     offsets.clear()
     lengths.clear()
     edges.clear()
-    vertexPartitionMap.clear
   }
 
   def getNeighbors(vid: Int): Array[(Int, Float)] = {

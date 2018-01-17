@@ -117,11 +117,17 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     val p2 = Array(2, 2, 2, 2, 1)
     val p3 = Array(3, 4, 2, 3)
     val p4 = Array(4)
+    val expected = Array((1, (4, 2)), (2, (7, 3)), (3, (2, 1)), (4, (2, 2)))
 
     val paths = sc.parallelize(Array(p1, p2, p3, p4))
     var rw = UniformRandomWalk(sc, config)
     var counts = rw.queryPaths(paths)
-    assert(counts sameElements Array((1, (4, 2)), (2, (7, 3)), (3, (2, 1)), (4, (2, 2))))
+    assert(counts sameElements expected)
+
+    config = Params()
+    rw = UniformRandomWalk(sc, config)
+    counts = rw.queryPaths(paths)
+    assert(counts sameElements expected)
   }
 
   test("Experiments") {
@@ -129,17 +135,20 @@ class UniformRandomWalkTest extends org.scalatest.FunSuite with BeforeAndAfter {
     var config = Params(input = karate,
       output = "", directed = false, walkLength = 10,
       rddPartitions = 8, numWalks = 1, cmd = TaskName.firstorder, nodes = query.mkString(" "))
-
-//    Main.execute(sc, config)
+    var rw = UniformRandomWalk(sc, config)
+    val g = rw.loadGraph()
+    val paths = rw.firstOrderWalk(g)
+    val counts1 = rw.queryPaths(paths)
+    assert(counts1.length == 34)
 
     config = Params(input = karate, directed = false, walkLength = 10,
       rddPartitions = 8, numWalks = 1, cmd = TaskName.firstorder)
-    val rw = UniformRandomWalk(sc, config)
-    val g = rw.loadGraph()
-    var paths = rw.firstOrderWalk(g)
-    val counts1 = rw.queryPaths(paths)
-    assert(counts1.length == 34)
-    println(counts1.mkString(" "))
+
+    rw = UniformRandomWalk(sc, config)
+    val counts2 = rw.queryPaths(paths)
+    assert(counts2.length == 34)
+
+    assert(counts1.sortBy(_._1) sameElements counts2.sortBy(_._1))
   }
 
   private def doFirstOrderRandomWalk(gMap: GraphMap.type, src: Int,

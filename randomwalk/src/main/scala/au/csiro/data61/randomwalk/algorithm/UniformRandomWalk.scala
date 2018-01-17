@@ -169,31 +169,36 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Seri
     context.parallelize(counts, config.rddPartitions).map {
       case (vId, (count, occurs)) =>
         s"$vId\t$count\t$occurs"
-    }.repartition(config.rddPartitions).saveAsTextFile(s"${config.output}.${Property.countsSuffix}")
+    }.repartition(1).saveAsTextFile(s"${config.output}.${Property.countsSuffix}")
   }
 
   def queryPaths(paths: RDD[Array[Int]]): Array[(Int, (Int, Int))] = {
     var nodes: Array[Int] = Array.empty[Int]
-
+    var numOccurrences: Array[(Int, (Int, Int))] = null
     if (config.nodes.isEmpty) {
-      nodes = GraphMap.getVertices()
+      numOccurrences = paths.mapPartitions { iter =>
+        iter.flatMap { case steps =>
+          steps.groupBy(a => a).map { case (a, occurs) => (a, (occurs.length, 1)) }
+        }
+      }.reduceByKey((a, b) => (a._1 + b._1, a._2 + b._2)).collect()
     } else {
       nodes = config.nodes.split("\\s+").map(s => s.toInt)
-    }
-    val numOccurrences = new Array[(Int, (Int, Int))](nodes.length)
+      numOccurrences = new Array[(Int, (Int, Int))](nodes.length)
 
-    for (i <- 0 until nodes.length) {
-      val bcNode = context.broadcast(nodes(i))
-      numOccurrences(i) = (nodes(i),
-        paths.mapPartitions { iter =>
-          val targetNode = bcNode.value
-          iter.map { case steps =>
-            val counts = steps.count(s => s == targetNode)
-            val occurs = if (counts > 0) 1 else 0
-            (counts, occurs)
-          }
-        }.reduce((c, o) => (c._1 + o._1, c._2 + o._2)))
+      for (i <- 0 until nodes.length) {
+        val bcNode = context.broadcast(nodes(i))
+        numOccurrences(i) = (nodes(i),
+          paths.mapPartitions { iter =>
+            val targetNode = bcNode.value
+            iter.map { case steps =>
+              val counts = steps.count(s => s == targetNode)
+              val occurs = if (counts > 0) 1 else 0
+              (counts, occurs)
+            }
+          }.reduce((c, o) => (c._1 + o._1, c._2 + o._2)))
+      }
     }
+
 
     numOccurrences
   }

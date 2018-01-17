@@ -45,7 +45,6 @@ and the following options are available:
    --input <value>          Input edge file path: empty
    --output <value>         Output path: empty
    --cmd <value>            command: node2vec
-   --kryo <value>           Whether to use kryo serializer or not: false
    --partitioned <value>    Whether the graph is partitioned: false
    --lr <value>             Learning rate in word2vec: 0.025
    --iter <value>           Number of iterations in word2vec: 10

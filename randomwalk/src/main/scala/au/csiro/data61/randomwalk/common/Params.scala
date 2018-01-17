@@ -6,7 +6,7 @@ import au.csiro.data61.randomwalk.common.CommandParser.TaskName.TaskName
 
 case class Params(w2vIter: Int = 10,
                   w2vLr: Double = 0.025,
-                  w2vPartitions: Int = 10,
+                  w2vPartitions: Int = 1,
                   w2vDim: Int = 128,
                   w2vWindow: Int = 10,
                   walkLength: Int = 80,

@@ -166,7 +166,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Seri
 
   def save(counts: Array[(Int, (Int, Int))]) = {
 
-    context.parallelize(counts, config.rddPartitions).map {
+    context.parallelize(counts, config.rddPartitions).sortBy(_._2._2, ascending = false).map {
       case (vId, (count, occurs)) =>
         s"$vId\t$count\t$occurs"
     }.repartition(1).saveAsTextFile(s"${config.output}.${Property.countsSuffix}")

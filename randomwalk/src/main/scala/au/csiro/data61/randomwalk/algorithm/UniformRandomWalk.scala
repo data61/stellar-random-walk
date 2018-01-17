@@ -165,7 +165,13 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Seri
   }
 
   def queryPaths(paths: RDD[Array[Int]]): Array[(Int, (Int, Int))] = {
-    val nodes = config.nodes.split("\\s+").map(s => s.toInt)
+    var nodes: Array[Int] = Array.empty[Int]
+
+    if (config.nodes.isEmpty) {
+      nodes = GraphMap.getVertices()
+    } else {
+      nodes = config.nodes.split("\\s+").map(s => s.toInt)
+    }
     val numOccurrences = new Array[(Int, (Int, Int))](nodes.length)
 
     for (i <- 0 until nodes.length) {

@@ -36,6 +36,11 @@ object GraphMap {
     }
   }
 
+  def getVertices():Array[Int] ={
+    val vertices:Array[Int] = srcVertexMap.keys.toArray
+    vertices
+  }
+
   private def updateIndices(vId: Int, outDegree: Int): Unit = {
     srcVertexMap.put(vId, indexCounter)
     offsets.insert(indexCounter, offsetCounter)

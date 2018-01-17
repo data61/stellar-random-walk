@@ -11,8 +11,6 @@ object CommandParser {
 
   val WALK_LENGTH = "walkLength"
   val NUM_WALKS = "numWalks"
-  val P = "p"
-  val Q = "q"
   val RDD_PARTITIONS = "rddPartitions"
   val WEIGHTED = "weighted"
   val DIRECTED = "directed"
@@ -30,12 +28,6 @@ object CommandParser {
     opt[Int](NUM_WALKS)
       .text(s"numWalks: ${defaultParams.numWalks}")
       .action((x, c) => c.copy(numWalks = x))
-    opt[Double](P)
-      .text(s"return parameter p: ${defaultParams.p}")
-      .action((x, c) => c.copy(p = x))
-    opt[Double](Q)
-      .text(s"in-out parameter q: ${defaultParams.q}")
-      .action((x, c) => c.copy(q = x))
     opt[Int](RDD_PARTITIONS)
       .text(s"Number of RDD partitions in running Random Walk and Word2vec: ${
         defaultParams
@@ -58,8 +50,8 @@ object CommandParser {
       .action((x, c) => c.copy(output = x))
     opt[String](NODE_IDS)
       .required()
-      .text("Edge IDs to query from the paths: empty")
-      .action((x, c) => c.copy(output = x))
+      .text("Node IDs to query from the paths: empty")
+      .action((x, c) => c.copy(nodes = x))
     opt[String](CMD)
       .required()
       .text(s"command: ${defaultParams.cmd.toString}")

@@ -12,6 +12,7 @@ object Main {
   def main(args: Array[String]) {
     CommandParser.parse(args) match {
       case Some(params) =>
+        logger.info(params.nodes)
         val conf = new SparkConf().setAppName("Node2Vec")
         val context: SparkContext = new SparkContext(conf)
         execute(context, params)

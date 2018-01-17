@@ -7,6 +7,11 @@
   <version>0.0.1-SNAPSHOT</version>
   <url>https://github.com/data61/stellar-random-walk</url>
   <build>
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+    </testResources>
     <plugins>
       <plugin>
         <groupId>org.scala-tools</groupId>
@@ -68,11 +73,6 @@
     </plugins>
   </build>
   <repositories>
-    <repository>
-      <id>spark-jobserver-repo</id>
-      <name>SparkJobServer Repository</name>
-      <url>https://dl.bintray.com/spark-jobserver/maven/</url>
-    </repository>
     <repository>
       <id>central-maven</id>
       <name>Central Repository</name>
@@ -221,6 +221,10 @@
           <groupId>org.glassfish.jersey.containers</groupId>
         </exclusion>
         <exclusion>
+          <artifactId>netty-all</artifactId>
+          <groupId>io.netty</groupId>
+        </exclusion>
+        <exclusion>
           <artifactId>netty</artifactId>
           <groupId>io.netty</groupId>
         </exclusion>
@@ -332,6 +336,14 @@
       <version>3.0.4</version>
       <scope>provided</scope>
       <exclusions>
+        <exclusion>
+          <artifactId>scalactic_2.11</artifactId>
+          <groupId>org.scalactic</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>scala-reflect</artifactId>
+          <groupId>org.scala-lang</groupId>
+        </exclusion>
         <exclusion>
           <artifactId>scala-xml_2.11</artifactId>
           <groupId>org.scala-lang.modules</groupId>

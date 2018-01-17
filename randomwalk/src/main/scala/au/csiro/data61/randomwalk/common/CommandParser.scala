@@ -49,7 +49,6 @@ object CommandParser {
       .text("Output path: empty")
       .action((x, c) => c.copy(output = x))
     opt[String](NODE_IDS)
-      .required()
       .text("Node IDs to query from the paths: empty")
       .action((x, c) => c.copy(nodes = x))
     opt[String](CMD)

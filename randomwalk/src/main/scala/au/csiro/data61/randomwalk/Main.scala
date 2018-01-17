@@ -31,8 +31,8 @@ object Main {
           map(_.split("\\s+").map(s => s.toInt))
     }
 
-    val numOccurrences = rw.queryPaths(paths)
-    println(
-      s"Number of occurrences of nodes:\n${numOccurrences.mkString(" ")}")
+    val counts = rw.queryPaths(paths)
+    println(s"Total counts: ${counts.length}")
+    rw.save(counts)
   }
 }

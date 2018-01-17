@@ -164,6 +164,14 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Seri
     paths
   }
 
+  def save(counts: Array[(Int, (Int, Int))]) = {
+
+    context.parallelize(counts, config.rddPartitions).map {
+      case (vId, (count, occurs)) =>
+        s"$vId\t$count\t$occurs"
+    }.repartition(config.rddPartitions).saveAsTextFile(s"${config.output}.${Property.countsSuffix}")
+  }
+
   def queryPaths(paths: RDD[Array[Int]]): Array[(Int, (Int, Int))] = {
     var nodes: Array[Int] = Array.empty[Int]
 

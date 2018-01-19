@@ -9,6 +9,34 @@ import scala.util.Try
 
 case class UniformRandomWalk(context: SparkContext, config: Params) extends RandomWalk {
 
+  def prepareForAliasSampling(edges: RDD[(Int, Array[(Int, Float)])]) = {
+    val neighbors = edges.reduceByKey(_ ++ _).partitionBy(partitioner).cache()
+    edges.map { case (src, edge) =>
+      val dst = edge(0)._1
+      val w = edge(0)._2
+      (dst, (src, w))
+    }.partitionBy(partitioner).join(neighbors).map { case (dst, ((src, w), dstNeighbors)) =>
+      (src, (dst, w, dstNeighbors))
+    }.map { case (src, (dst, w, dstNeighbors)) =>
+      (src, Array((dst, w, dstNeighbors)))
+    }.reduceByKey(_ ++ _)
+  }
+
+  def buildRoutingTableWithAlias(graph: RDD[(Int, Array[(Int, Float, Array[(Int, Float)])])])
+  : RDD[Int] = {
+    val bcP = context.broadcast(config.p)
+    val bcQ = context.broadcast(config.q)
+    graph.mapPartitionsWithIndex({
+      (id: Int, iter: Iterator[(Int, Array[(Int, Float, Array[(Int, Float)])])]) =>
+        iter.foreach { case (vId, neighbors) =>
+          GraphMap.addVertex(p = bcP.value.toFloat, q = bcQ.value.toFloat)(vId, neighbors)
+          id
+        }
+        Iterator.empty
+    }, preservesPartitioning = true
+    )
+  }
+
   /**
     * Loads the graph and computes the probabilities to go from each vertex to its neighbors
     *
@@ -20,7 +48,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
     val bcDirected = context.broadcast(config.directed)
     val bcWeighted = context.broadcast(config.weighted) // is weighted?
 
-    val g: RDD[(Int, Array[(Int, Float)])] = context.textFile(config.input, minPartitions
+    val edges: RDD[(Int, Array[(Int, Float)])] = context.textFile(config.input, minPartitions
       = config
       .rddPartitions).flatMap { triplet =>
       val parts = triplet.split("\\s+")
@@ -37,12 +65,21 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
       } else {
         Array((src, Array((dst, weight))), (dst, Array((src, weight))))
       }
-    }.
-      reduceByKey(_ ++ _).
-      partitionBy(partitioner).
-      persist(StorageLevel.MEMORY_AND_DISK)
+    }
 
-    routingTable = buildRoutingTable(g).persist(StorageLevel.MEMORY_ONLY)
+    val g = config.aliasSampling match {
+      case false =>
+        val graph = edges.reduceByKey(_ ++ _).partitionBy(partitioner).persist(StorageLevel
+          .MEMORY_AND_DISK)
+        routingTable = buildRoutingTable(graph).persist(StorageLevel.MEMORY_ONLY)
+        graph
+      case true =>
+        val graph = prepareForAliasSampling(edges).persist(StorageLevel.MEMORY_AND_DISK)
+        routingTable = buildRoutingTableWithAlias(graph).persist(StorageLevel.MEMORY_ONLY)
+        graph
+    }
+
+
     routingTable.count()
 
     val vAccum = context.longAccumulator("vertices")
@@ -58,7 +95,7 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
         lAcc.add(e)
       }
       iter.foreach {
-        case (_, (neighbors: Array[(Int, Float)])) =>
+        case (_, (neighbors)) =>
           vAccum.add(1)
           eAccum.add(neighbors.length)
       }
@@ -106,6 +143,16 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Rand
         iter.map {
           case (_, (steps, prevNeighbors, completed)) => (steps.last, (steps, prevNeighbors,
             completed))
+        }
+    }, preservesPartitioning = false)
+
+  }
+
+  def prepareWalkersToTransferForAliasWalk(walkers: RDD[(Int, (Array[Int], Boolean))]) = {
+    walkers.mapPartitions({
+      iter =>
+        iter.map {
+          case (_, (steps, completed)) => (steps.last, (steps, completed))
         }
     }, preservesPartitioning = false)
 

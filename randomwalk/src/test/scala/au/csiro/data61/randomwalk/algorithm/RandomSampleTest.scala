@@ -8,19 +8,18 @@ class RandomSampleTest extends FunSuite {
   // TODO assert can move to a function for DRY purpose.
   test("Test random sample function") {
     var rValue = 0.1f
-    var random = RandomSample(nextFloat = () => rValue)
-    assert(random.nextFloat() == rValue)
+    var sample = RandomSample.sample(nextFloat = () => rValue)_
     val e1 = (1, 1.0f)
     val e2 = (2, 1.0f)
     val e3 = (3, 1.0f)
     val edges = Array(e1, e2, e3)
-    assert(random.sample(edges) == e1)
+    assert(sample(edges) == e1)
     rValue = 0.4f
-    random = RandomSample(nextFloat = () => rValue)
-    assert(random.sample(edges) == e2)
+    sample = RandomSample.sample(nextFloat = () => rValue)_
+    assert(sample(edges) == e2)
     rValue = 0.7f
-    random = RandomSample(nextFloat = () => rValue)
-    assert(random.sample(edges) == e3)
+    sample = RandomSample.sample(nextFloat = () => rValue)_
+    assert(sample(edges) == e3)
   }
 
   test("Test second order random selection") {
@@ -38,28 +37,28 @@ class RandomSampleTest extends FunSuite {
     var p = 1.0f
     var q = 1.0f
 
-    var random = RandomSample()
-    var biasedWeights = random.computeSecondOrderWeights(p, q, prevId, prevNeighbors,
+    var biasedWeights = RandomSample.computeSecondOrderWeights(p, q, prevId, prevNeighbors,
       currNeighbors)
     assert(biasedWeights sameElements currNeighbors)
 
     var rValue = 0.1f
-    random = RandomSample(nextFloat = () => rValue)
-    assert(random.secondOrderSample(p, q, prevId, prevNeighbors, currNeighbors) == e21)
+    var soSample = RandomSample.secondOrderSample(nextFloat = () => rValue)_
+    assert(soSample(p, q, prevId, prevNeighbors, currNeighbors) == e21)
 
     rValue = 0.4f
-    random = RandomSample(nextFloat = () => rValue)
-    assert(random.secondOrderSample(p, q, prevId, prevNeighbors, currNeighbors) == e23)
+    soSample = RandomSample.secondOrderSample(nextFloat = () => rValue)_
+    assert(soSample(p, q, prevId, prevNeighbors, currNeighbors) == e23)
 
     rValue = 0.7f
-    random = RandomSample(nextFloat = () => rValue)
-    assert(random.secondOrderSample(p, q, prevId, prevNeighbors, currNeighbors) == e24)
+    soSample = RandomSample.secondOrderSample(nextFloat = () => rValue)_
+    assert(soSample(p, q, prevId, prevNeighbors, currNeighbors) == e24)
 
     p = 2.0f
     q = 2.0f
     prevNeighbors = Array(e12, e15)
 
-    biasedWeights = random.computeSecondOrderWeights(p, q, prevId, prevNeighbors, currNeighbors)
+    biasedWeights = RandomSample.computeSecondOrderWeights(p, q, prevId, prevNeighbors,
+      currNeighbors)
     var e1 = (currNeighbors(0)._1, w1 / p)
     var e2 = (currNeighbors(1)._1, w1 / q)
     var e3 = (currNeighbors(2)._1, w1 / q)
@@ -67,25 +66,26 @@ class RandomSampleTest extends FunSuite {
 
     prevNeighbors = Array(e12, e14, e15)
     rValue = 0.24f
-    random = RandomSample(nextFloat = () => rValue)
-    biasedWeights = random.computeSecondOrderWeights(p, q, prevId, prevNeighbors, currNeighbors)
+    soSample = RandomSample.secondOrderSample(nextFloat = () => rValue)_
+    biasedWeights = RandomSample.computeSecondOrderWeights(p, q, prevId, prevNeighbors,
+      currNeighbors)
     e1 = (currNeighbors(0)._1, w1 / p)
     e2 = (currNeighbors(1)._1, w1 / q)
     e3 = (currNeighbors(2)._1, w1)
     assert(biasedWeights sameElements Array(e1, e2, e3))
-    assert(random.secondOrderSample(p, q, prevId, prevNeighbors, currNeighbors) == e1)
+    assert(soSample(p, q, prevId, prevNeighbors, currNeighbors) == e1)
 
     rValue = 0.26f
-    random = RandomSample(nextFloat = () => rValue)
-    assert(random.secondOrderSample(p, q, prevId, prevNeighbors, currNeighbors) == e2)
+    soSample = RandomSample.secondOrderSample(nextFloat = () => rValue)_
+    assert(soSample(p, q, prevId, prevNeighbors, currNeighbors) == e2)
 
     rValue = 0.51f
-    random = RandomSample(nextFloat = () => rValue)
-    assert(random.secondOrderSample(p, q, prevId, prevNeighbors, currNeighbors) == e3)
+    soSample = RandomSample.secondOrderSample(nextFloat = () => rValue)_
+    assert(soSample(p, q, prevId, prevNeighbors, currNeighbors) == e3)
 
     rValue = 0.99f
-    random = RandomSample(nextFloat = () => rValue)
-    assert(random.secondOrderSample(p, q, prevId, prevNeighbors, currNeighbors) == e3)
+    soSample = RandomSample.secondOrderSample(nextFloat = () => rValue)_
+    assert(soSample(p, q, prevId, prevNeighbors, currNeighbors) == e3)
 
     // check if orginal weights are unchanged
     assert(currNeighbors(0)._2 == w1)

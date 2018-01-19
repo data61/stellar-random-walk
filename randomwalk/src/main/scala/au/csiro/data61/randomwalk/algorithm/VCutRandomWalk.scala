@@ -133,4 +133,6 @@ case class VCutRandomWalk(context: SparkContext,
 
   }
 
+  override def prepareWalkersToTransferForAliasWalk(walkers: RDD[(Int, (Array[Int], Boolean))]) =
+    ???
 }

@@ -18,20 +18,67 @@ This repository includes the implementation of node2vec.
 * (Optional): Spark-JobServer 0.8.0 or later.
 
 ## Quick Setup ##
-First, you need to download the application source code. You need to go to the source code directory and run the following command:
+1. Get the random walk application source code:
 
-` mvn clean package `
+    * using git: ' git clone git@github.com:data61/stellar-random-walk.git '
+    * using http: download the [zip file](https://github.com/data61/stellar-random-walk/archive/master.zip) and unzip it.
+    
+2. Go to the source code directory. A pre-built jar file, named *randomwalk-0.0.1-SNAPSHOT.jar*, is available at *./target*. To run the application, you use this jar file. (If you want to build the jar file from the source code, you need to have Apache Maven installed and run: ` mvn clean package `)
 
-This creates a jar file named *randomwalk-0.0.1-SNAPSHOT.jar* in the directory *target*. To run the application, you use this jar file.
+3. Download [Apache Spark 2.2.0 or later](https://spark.apache.org/downloads.html) (e.g release 2.2.1, pre-built for apache hadoop 2.7)
 
-You need to download Apache Spark 2.2.0 or later in order to run the application.
-
-## Running the Application ##
+### Run the Application Using Spark (local machine) ###
 To run the application on your machine, you can use spark-submit script. Go to the Apache Spark directory. Run the application with the following command:
 
-` bin/spark-submit --class au.csiro.data61.randomwalk.Main ./randomwalk/target/randomwalk-0.0.1-SNAPSHOT.jar `
+` bin/spark-submit --class au.csiro.data61.randomwalk.Main [random walk dir]/target/randomwalk-0.0.1-SNAPSHOT.jar `
 
-and the following options are available:
+### Run the Application Using Spark Job-server ###
+4. make sure that the prerequisites are installed: 
+    - [Apache spark](https://spark.apache.org/downloads.html) (e.g release 2.2.1, pre-built for apache hadoop 2.7) 
+    - Java Virtual Machine (e.g. 9.0.1)
+    - [sbt](https://www.scala-sbt.org/)
+
+5. git clone [job-server](https://github.com/spark-jobserver/spark-jobserver)
+6. Create a `.bashrc` with the paths to JVM, sbt and spark, e.g., for Mac OS users it will be the following:
+
+    `
+    export SBT=/usr/local/Cellar/sbt/1.1.0
+    export SPARK_HOME=~/spark-2.2.1-bin-hadoop2.7
+    export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-9.0.1.jdk
+    export PATH=$JAVA_HOME/bin:$SBT/bin:$PATH
+    `
+
+7. Run 
+
+      `source .bashrc`
+        
+8. Go to spark folder and run `start-all.sh`:
+```
+cd spark-2.2.1-bin-hadoop2.7/
+sbin/sbin/start-all.sh
+```
+9. From spark Job-server run sbt shell:
+```
+cd spark-jobserver/job-server/
+sbt
+```
+10. Once inside sbt shell, run `reStart`.
+
+11. Go to `http://localhost:8090/` and make sure that Spark Job Server UI is working (Note: in Chrome binaries were not updated properly, while in Firefox it was ok)
+
+12. upload randomwalk jar to the server:
+
+    `curl --data-binary @randomwalk/target/randomwalk-0.0.1-SNAPSHOT.jar localhost:8090/jars/randomwalk`
+
+13. submit a job:
+
+    `curl -d "rw.input = --cmd randomwalk --numWalks 1 --p 1 --q 1 --walkLength 10 --rddPartitions 10 --directed false --input [random walk dir]/src/test/resources/karate.txt --output [output dir] --partitioned false" 'localhost:8090/jobs?appName=randomwalk&classPath=au.csiro.data61.randomwalk.Main'`
+
+14. Check the status in the Spark Job-server UI
+
+
+## Application Options ##
+The following options are available:
 
 ```
 --walkLength <value>     walkLength: 80

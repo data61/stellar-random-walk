@@ -174,6 +174,6 @@ trait RandomWalk extends Serializable {
       case (path) =>
         val pathString = path.mkString("\t")
         s"$pathString"
-    }.repartition(partitions).saveAsTextFile(s"${output}.${Property.pathSuffix}")
+    }.repartition(partitions).saveAsTextFile(s"${output}/${Property.pathSuffix}")
   }
 }

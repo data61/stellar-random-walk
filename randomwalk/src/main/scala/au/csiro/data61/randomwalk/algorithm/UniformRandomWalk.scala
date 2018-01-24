@@ -12,6 +12,20 @@ import scala.util.control.Breaks.{break, breakable}
 import scala.util.{Random, Try}
 
 case class UniformRandomWalk(context: SparkContext, config: Params) extends Serializable {
+  def save(degrees: Array[Int]) = {
+    val file = new File(s"${config.output}.${Property.degreeSuffix}.txt")
+    val bw = new BufferedWriter(new FileWriter(file))
+    bw.write(degrees.zipWithIndex.map{case (d, i) => s"${i+1}\t$d"}.mkString("\n"))
+    bw.flush()
+    bw.close()
+  }
+
+  def degrees():Array[Int] = {
+    val degrees = new Array[Int](nVertices)
+    GraphMap.getVertices().foreach(v =>degrees(v-1) = GraphMap.getNeighbors(v).length)
+    degrees
+  }
+
   def save(probs: Array[Array[Double]]): Unit = {
     val file = new File(s"${config.output}.${Property.probSuffix}.txt")
     val bw = new BufferedWriter(new FileWriter(file))

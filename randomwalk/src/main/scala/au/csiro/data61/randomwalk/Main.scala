@@ -32,6 +32,10 @@ object Main {
       case TaskName.probs =>
         val g = rw.loadGraph()
         rw.save(rw.firstOrderWalk(g))
+      case TaskName.degrees =>
+        rw.loadGraph()
+        rw.save(rw.degrees())
+        null
     }
 
     params.cmd match {
@@ -43,6 +47,7 @@ object Main {
         val probs = rw.computeProbs(paths)
         println(s"Total prob entries: ${probs.length}")
         rw.save(probs)
+      case _ =>
     }
   }
 }

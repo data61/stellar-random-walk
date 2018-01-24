@@ -17,7 +17,6 @@ case class Params(w2vIter: Int = 10,
                   directed: Boolean = false,
                   input: String = null,
                   output: String = null,
-                  useKyroSerializer: Boolean = false,
                   rddPartitions: Int = 200,
                   partitioned: Boolean = false,
                   cmd: TaskName = TaskName.node2vec) extends AbstractParams[Params]

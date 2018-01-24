@@ -29,10 +29,20 @@ object Main {
       case TaskName.queryPaths =>
         context.textFile(params.input).repartition(params.rddPartitions).
           map(_.split("\\s+").map(s => s.toInt))
+      case TaskName.probs =>
+        val g = rw.loadGraph()
+        rw.save(rw.firstOrderWalk(g))
     }
 
-    val counts = rw.queryPaths(paths)
-    println(s"Total counts: ${counts.length}")
-    rw.save(counts)
+    params.cmd match {
+      case TaskName.queryPaths =>
+        val counts = rw.queryPaths(paths)
+        println(s"Total counts: ${counts.length}")
+        rw.save(counts)
+      case TaskName.probs =>
+        val probs = rw.computeProbs(paths)
+        println(s"Total prob entries: ${probs.length}")
+        rw.save(probs)
+    }
   }
 }

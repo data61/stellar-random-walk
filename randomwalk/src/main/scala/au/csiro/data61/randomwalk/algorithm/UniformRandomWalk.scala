@@ -1,5 +1,7 @@
 package au.csiro.data61.randomwalk.algorithm
 
+import java.io.{BufferedWriter, File, FileWriter}
+
 import au.csiro.data61.randomwalk.common.{Params, Property}
 import org.apache.log4j.LogManager
 import org.apache.spark.rdd.RDD
@@ -10,6 +12,31 @@ import scala.util.control.Breaks.{break, breakable}
 import scala.util.{Random, Try}
 
 case class UniformRandomWalk(context: SparkContext, config: Params) extends Serializable {
+  def save(probs: Array[Array[Double]]): Unit = {
+    val file = new File(s"${config.output}.${Property.probSuffix}.txt")
+    val bw = new BufferedWriter(new FileWriter(file))
+    bw.write(probs.map(array => array.map(a => f"$a%1.4f").mkString("\t")).mkString("\n"))
+    bw.flush()
+    bw.close()
+  }
+
+
+  def computeProbs(paths: RDD[Array[Int]]): Array[Array[Double]] = {
+    val matrix = Array.ofDim[Double](nVertices, nVertices)
+    paths.collect().foreach { case p =>
+      for (i <- 0 until p.length - 1) {
+        matrix(p(i) - 1)(p(i + 1) - 1) += 1
+      }
+    }
+
+    matrix.map { row =>
+      val sum = row.sum
+      row.map { o =>
+        o / sum.toDouble
+      }
+    }
+  }
+
 
   lazy val partitioner: HashPartitioner = new HashPartitioner(config.rddPartitions)
   var routingTable: RDD[Int] = _

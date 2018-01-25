@@ -107,7 +107,7 @@ The following options are available:
    --input [input edge list] --output [output directory] --partitioned false
    ```
 
-## Graph File Format ##
+## Graph Input File Format ##
 The input graph must be an edge list with integer vertex IDs. For example:
 
 ``` 
@@ -130,6 +130,16 @@ src3-id dst1-id 2 1.0
 ```
 
 The application itself will replicate (cut) those vertices that span among multiple partitions.
+
+## Output Format ##
+The application writes output to the disk in the directory given by the --output parameter. In this directory, three folders may be created:
+   - /path: the result for randomwalk.
+   - /vec: vector representation of vertices.
+   - /bin: word2vec model's metadata.
+   
+The output of the randomwalk (in the /path directory) is in the format of tab-separated integers (vertex-ids), where each line represents random steps starting from a vertex. The number of lines are equal to the number of generated paths (--numWalks*|V|). The result is partitioned in --rddPartitions number of files as plain text.
+
+The embeddings are also in the the format of tab-separated numbers per line, where the first number represents the vertex-id and the rest of the numbers in that line represent the vertex's vector representation. The result is partitioned in --rddPartition number of files and is written as plain text.
 
 
 ## References ##

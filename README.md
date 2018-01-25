@@ -146,6 +146,25 @@ The output of the randomwalk (in the /path directory) is in the format of tab-se
 
 The embeddings are also in the the format of tab-separated numbers per line, where the first number represents the vertex-id and the rest of the numbers in that line represent the vertex's vector representation. The result is partitioned in --rddPartition number of files and is written as plain text.
 
+An example of randomwalk output:
+```
+4	2	4	2	4
+
+32	26	32	33	16
+
+20	2	31	2	31
+...
+```
+
+An example of vecotor representations:
+```
+34	-0.055403516	-0.007816158	0.053844377	-0.038890388	0.13484207	-0.07744342
+
+12	-0.025323598	0.054739047	-0.077121474	-0.016575111	-0.041371193	-0.046176624
+
+8	-0.07687951	0.120588094	-0.11744399	-0.058044944	-0.061426725	-0.13111477
+...
+```
 
 ## References ##
 1. (Grover, Aditya, and Jure Leskovec. "node2vec: Scalable feature learning for networks." Proceedings of the 22nd ACM SIGKDD international conference on Knowledge discovery and data mining. ACM, 2016.).

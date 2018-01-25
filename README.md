@@ -81,7 +81,7 @@ sbt
 The following options are available:
 
 ```
---walkLength <value>     walkLength: 80
+   --walkLength <value>     walkLength: 80
    --numWalks <value>       numWalks: 10
    --p <value>              return parameter p: 1.0
    --q <value>              in-out parameter q: 1.0
@@ -89,24 +89,29 @@ The following options are available:
    --weighted <value>       weighted: true
    --directed <value>       directed: false
    --w2vPartitions <value>  Number of partitions in word2vec: 10
-   --input <value>          Input edge file path: empty
+   --input <value>          Input edge-file/paths-file: empty
    --output <value>         Output path: empty
-   --cmd <value>            command: node2vec
+   --cmd <value>            command: randomwalk/embedding/node2vec (to run randomwalk + embedding)
    --partitioned <value>    Whether the graph is partitioned: false
    --lr <value>             Learning rate in word2vec: 0.025
    --iter <value>           Number of iterations in word2vec: 10
    --dim <value>            Number of dimensions in word2vec: 128
    --window <value>         Window size in word2vec: 10
-   ```
+```
 
-   For example:
-
-   ```
+For example:
+```
    bin/spark-submit --class au.csiro.data61.randomwalk.Main ./randomwalk/target/randomwalk-0.0.1-SNAPSHOT.jar \
    --cmd randomwalk --numWalks 1 --p 1 --q 1 --walkLength 10 --rddPartitions 10 \
    --input [input edge list] --output [output directory] --partitioned false
-   ```
+```
 
+
+You can choose the algorithm to run by the --cmd option:
+- **randomwalk**: to run just the second-order randomwalk.
+- **embedding**: to run just word2vec given paths as input.
+- **node2vec**: to run randomwalk + embedding
+     
 ## Graph Input File Format ##
 The input graph must be an edge list with integer vertex IDs. For example:
 

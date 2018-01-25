@@ -38,7 +38,7 @@ object Main extends SparkJob {
     model.save(context, s"${config.output}.${Property.modelSuffix}")
     context.parallelize(model.getVectors.toList, config.rddPartitions).map { case (nodeId,
     vector) =>
-      s"$nodeId\t${vector.mkString(",")}"
+      s"$nodeId\t${vector.mkString("\t")}"
     }.saveAsTextFile(s"${config.output}.${Property.vectorSuffix}")
   }
 

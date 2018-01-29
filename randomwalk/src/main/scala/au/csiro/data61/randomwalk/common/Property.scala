@@ -6,4 +6,5 @@ object Property extends Enumeration {
   val pathSuffix = Value(s"path-${suffix}")
   val probSuffix = Value(s"probs-${suffix}")
   val degreeSuffix = Value(s"degrees-${suffix}")
+  val affecteds = Value(s"affecteds-${suffix}")
 }

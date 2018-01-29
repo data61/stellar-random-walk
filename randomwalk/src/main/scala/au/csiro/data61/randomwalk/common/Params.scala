@@ -12,5 +12,6 @@ case class Params(walkLength: Int = 80,
                   output: String = null,
                   rddPartitions: Int = 200,
                   partitioned: Boolean = false,
+                  affectedLength: Int = 3,
                   nodes: String = "",
                   cmd: TaskName = TaskName.firstorder) extends AbstractParams[Params]

@@ -1,5 +1,7 @@
 package au.csiro.data61.randomwalk
 
+import java.util.concurrent.ConcurrentHashMap
+
 import au.csiro.data61.randomwalk.algorithm.UniformRandomWalk
 import au.csiro.data61.randomwalk.common.CommandParser.TaskName
 import au.csiro.data61.randomwalk.common.{CommandParser, Params}
@@ -35,6 +37,11 @@ object Main {
       case TaskName.degrees =>
         rw.loadGraph()
         rw.save(rw.degrees())
+        null
+      case TaskName.affecteds =>
+        val vertices = rw.loadGraph().map { case (v, p) => v }
+        val affecteds = rw.computeAffecteds(vertices, params.affectedLength)
+        rw.saveAffecteds(affecteds)
         null
     }
 

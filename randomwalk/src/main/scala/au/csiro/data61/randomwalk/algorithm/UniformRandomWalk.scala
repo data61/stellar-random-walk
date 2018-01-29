@@ -12,17 +12,64 @@ import scala.util.control.Breaks.{break, breakable}
 import scala.util.{Random, Try}
 
 case class UniformRandomWalk(context: SparkContext, config: Params) extends Serializable {
+
+  def computeAffecteds(vertices: RDD[Int], affectedLength: Int): RDD[(Int,
+    Array[Int])] = {
+    val bcL = context.broadcast(affectedLength)
+
+    vertices.map { v =>
+      def computeAffecteds(afs: Array[Int], v: Int, al: Int,
+                           length: Int)
+      : Unit = {
+        if (length >= al)
+          return
+        val neighbors = GraphMap.getNeighbors(v)
+        if (neighbors != null) {
+          afs(length) += neighbors.length
+          for (n <- neighbors) {
+            computeAffecteds(afs, n._1, al, length + 1)
+          }
+        }
+      }
+      
+      val affecteds = new Array[Int](bcL.value)
+      computeAffecteds(affecteds, v, bcL.value, 0)
+      (v, affecteds)
+    }
+  }
+
+  //  private def computeAffecteds(afs: Array[Int], v: Int, al: Int,
+  //                               length: Int)
+  //  : Unit = {
+  //    if (length >= al)
+  //      return
+  //    val neighbors = GraphMap.getNeighbors(v)
+  //    if (neighbors != null) {
+  //      afs(length) += neighbors.length
+  //      for (n <- neighbors) {
+  //        computeAffecteds(afs, n._1, al, length + 1)
+  //      }
+  //    }
+  //  }
+
   def save(degrees: Array[Int]) = {
     val file = new File(s"${config.output}.${Property.degreeSuffix}.txt")
     val bw = new BufferedWriter(new FileWriter(file))
-    bw.write(degrees.zipWithIndex.map{case (d, i) => s"${i+1}\t$d"}.mkString("\n"))
+    bw.write(degrees.zipWithIndex.map { case (d, i) => s"${i + 1}\t$d" }.mkString("\n"))
     bw.flush()
     bw.close()
   }
 
-  def degrees():Array[Int] = {
+  def saveAffecteds(afs: RDD[(Int, Array[Int])]) = {
+    afs.map {
+      case (vId, af) =>
+        s"$vId\t${af.mkString("\t")}"
+    }.repartition(1).saveAsTextFile(s"${config.output}.${Property.affecteds}")
+  }
+
+  def degrees(): Array[Int] = {
     val degrees = new Array[Int](nVertices)
-    GraphMap.getVertices().foreach(v =>degrees(v-1) = GraphMap.getNeighbors(v).length)
+    GraphMap.getVertices().foreach(v => degrees(v - 1) = GraphMap.getNeighbors(v).length)
     degrees
   }
 

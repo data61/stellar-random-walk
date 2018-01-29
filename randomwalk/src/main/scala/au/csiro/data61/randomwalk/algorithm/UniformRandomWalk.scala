@@ -1,6 +1,7 @@
 package au.csiro.data61.randomwalk.algorithm
 
 import java.io.{BufferedWriter, File, FileWriter}
+import java.util
 
 import au.csiro.data61.randomwalk.common.{Params, Property}
 import org.apache.log4j.LogManager
@@ -18,24 +19,32 @@ case class UniformRandomWalk(context: SparkContext, config: Params) extends Seri
     val bcL = context.broadcast(affectedLength)
 
     vertices.map { v =>
-      def computeAffecteds(afs: Array[Int], v: Int, al: Int,
+      def computeAffecteds(afs: Array[Int], visited: util.HashSet[Int], v: Int, al: Int,
                            length: Int)
       : Unit = {
         if (length >= al)
           return
+        visited.add(v)
         val neighbors = GraphMap.getNeighbors(v)
         if (neighbors != null) {
-          afs(length) += neighbors.length
           for (n <- neighbors) {
-            computeAffecteds(afs, n._1, al, length + 1)
+            if (!visited.contains(n._1)) {
+              afs(length) += 1
+              visited.add(n._1)
+              computeAffecteds(afs, visited, n._1, al, length + 1)
+            }
           }
         }
       }
-      
+
       val affecteds = new Array[Int](bcL.value)
-      computeAffecteds(affecteds, v, bcL.value, 0)
+      val visited = new util.HashSet[Int]()
+      visited.add(v)
+      affecteds(0) = 1
+      computeAffecteds(affecteds, visited, v, bcL.value, 0)
+
       (v, affecteds)
-    }
+    }.sortBy(_._2.last, ascending = false)
   }
 
   //  private def computeAffecteds(afs: Array[Int], v: Int, al: Int,

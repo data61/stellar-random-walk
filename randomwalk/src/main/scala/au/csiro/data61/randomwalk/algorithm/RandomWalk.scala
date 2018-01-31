@@ -82,7 +82,7 @@ trait RandomWalk extends Serializable {
     for (_ <- 0 until config.numWalks) {
       var unfinishedWalkers: RDD[(Int, (Array[Int], Array[(Int, Float)], Boolean))] = initFirstStep(
         initPaths, nextFloat)
-      var pathsPieces: RDD[Array[Int]] = context.emptyRDD[Array[Int]].repartition(config
+      var completedPaths: RDD[Array[Int]] = context.emptyRDD[Array[Int]].repartition(config
         .rddPartitions)
       var remainingWalkers = Int.MaxValue
 
@@ -138,9 +138,9 @@ trait RandomWalk extends Serializable {
           , preservesPartitioning = true
         ).persist(StorageLevel.MEMORY_AND_DISK)
 
-        pathsPieces = pathsPieces.union(filterCompletedPaths(unfinishedWalkers))
+        completedPaths = completedPaths.union(filterCompletedPaths(unfinishedWalkers))
           .persist(StorageLevel.MEMORY_AND_DISK)
-        pathsPieces.count()
+        completedPaths.count()
 
         unfinishedWalkers = filterUnfinishedWalkers(unfinishedWalkers)
 
@@ -161,11 +161,11 @@ trait RandomWalk extends Serializable {
       }
       while (remainingWalkers != 0)
 
-      val pCount = pathsPieces.count()
+      val pCount = completedPaths.count()
       if (pCount != nVertices) {
         println(s"Inconsistent number of paths: nPaths=[${pCount}] != vertices[$nVertices]")
       }
-      totalPaths = totalPaths.union(pathsPieces).persist(StorageLevel
+      totalPaths = totalPaths.union(completedPaths).persist(StorageLevel
         .MEMORY_AND_DISK)
 
       totalPaths.count()

@@ -231,7 +231,7 @@ trait RandomWalk extends Serializable {
     * @param partitions
     * @param output
     */
-  def save(paths: RDD[Array[Int]], partitions: Int, output: String) = {
+  def save(paths: RDD[Array[Int]], partitions: Int, output: String): Unit = {
 
     paths.map {
       case (path) =>

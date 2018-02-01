@@ -91,6 +91,7 @@ The following options are available:
    --w2vPartitions <value>  Number of partitions in word2vec: 10
    --input <value>          Input edge-file/paths-file: empty
    --output <value>         Output path: empty
+   --singleOutput <value>   Whether to write the output in a single file: true
    --cmd <value>            command: randomwalk/embedding/node2vec (to run randomwalk + embedding)
    --partitioned <value>    Whether the graph is partitioned: false
    --lr <value>             Learning rate in word2vec: 0.025
@@ -142,9 +143,9 @@ The application writes output to the disk in the directory given by the --output
    - /vec: vector representation of vertices.
    - /bin: word2vec model's metadata.
    
-The output of the randomwalk (in the /path directory) is in the format of tab-separated integers (vertex-ids), where each line represents random steps starting from a vertex. The number of lines are equal to the number of generated paths (--numWalks*|V|). The result is partitioned in --rddPartitions number of files as plain text.
+The output of the randomwalk (in the /path directory) is in the format of tab-separated integers (vertex-ids), where each line represents random steps starting from a vertex. The number of lines are equal to the number of generated paths (--numWalks*|V|). The result is partitioned in --rddPartitions number of files as plain text unless you set --singleOutput to true.
 
-The embeddings are also in the the format of tab-separated numbers per line, where the first number represents the vertex-id and the rest of the numbers in that line represent the vertex's vector representation. The result is partitioned in --rddPartition number of files and is written as plain text.
+The embeddings are also in the the format of tab-separated numbers per line, where the first number represents the vertex-id and the rest of the numbers in that line represent the vertex's vector representation. The result is partitioned in --rddPartition number of files and is written as plain text unless you set --singleOutput to true.
 
 An example of randomwalk output:
 ```

@@ -36,10 +36,11 @@ object Main extends SparkJob {
   private def saveModelAndFeatures(model: Word2VecModel, context: SparkContext, config: Params)
   : Unit = {
     model.save(context, s"${config.output}/${Property.modelSuffix}")
+    val numPartitions = getNumOutputPartition(config)
     context.parallelize(model.getVectors.toList, config.rddPartitions).map { case (nodeId,
     vector) =>
       s"$nodeId\t${vector.mkString("\t")}"
-    }.saveAsTextFile(s"${config.output}/${Property.vectorSuffix}")
+    }.repartition(numPartitions).saveAsTextFile(s"${config.output}/${Property.vectorSuffix}")
   }
 
   /**
@@ -55,8 +56,16 @@ object Main extends SparkJob {
       case false => UniformRandomWalk(context, param)
     }
     val paths = rw.execute()
-    rw.save(paths, param.rddPartitions, param.output)
+    val numPartitions = getNumOutputPartition(param)
+    rw.save(paths, numPartitions, param.output)
     paths
+  }
+
+  private def getNumOutputPartition(param: Params): Int = {
+    param.singleOutput match {
+      case true => 1
+      case false => param.rddPartitions
+    }
   }
 
   /**

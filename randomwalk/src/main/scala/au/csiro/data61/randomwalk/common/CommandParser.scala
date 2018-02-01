@@ -26,6 +26,7 @@ object CommandParser {
   val ITERATION = "iter"
   val DIMENSION = "dim"
   val WINDOW = "window"
+  val SINGLE_OUTPUT = "singleOutput"
 
   private lazy val defaultParams = Params()
   private lazy val parser = new OptionParser[Params]("2nd Order Random Walk + Word2Vec") {
@@ -54,6 +55,9 @@ object CommandParser {
     opt[Boolean](DIRECTED)
       .text(s"directed: ${defaultParams.directed}")
       .action((x, c) => c.copy(directed = x))
+    opt[Boolean](SINGLE_OUTPUT)
+      .text(s"generate single output file: ${defaultParams.singleOutput}")
+      .action((x, c) => c.copy(singleOutput = x))
     opt[Int](W2V_PARTITIONS)
       .text(s"Number of partitions in word2vec: ${defaultParams.w2vPartitions}")
       .action((x, c) => c.copy(w2vPartitions = x))

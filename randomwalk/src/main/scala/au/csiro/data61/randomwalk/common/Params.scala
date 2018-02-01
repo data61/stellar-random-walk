@@ -18,5 +18,6 @@ case class Params(w2vIter: Int = 10,
                   input: String = null,
                   output: String = null,
                   rddPartitions: Int = 200,
+                  singleOutput: Boolean = true,
                   partitioned: Boolean = false,
                   cmd: TaskName = TaskName.node2vec) extends AbstractParams[Params]

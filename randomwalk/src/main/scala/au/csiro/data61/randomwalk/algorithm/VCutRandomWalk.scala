@@ -7,6 +7,9 @@ import org.apache.spark.storage.StorageLevel
 
 import scala.util.{Random, Try}
 
+/**
+* The implementation of random walk that uses a vertex-cut partitioning of the graph.
+*/
 case class VCutRandomWalk(context: SparkContext,
                           config: Params) extends RandomWalk {
 
